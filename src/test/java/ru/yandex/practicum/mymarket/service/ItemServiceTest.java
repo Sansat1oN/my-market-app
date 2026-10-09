@@ -56,7 +56,7 @@ class ItemServiceTest {
     @Test
     void findItems_withSearchAndSortByPrice_searchesByTitleAndDescription() {
         Item milk = item(1L, "Молоко", 50L);
-        PageRequest pageable = PageRequest.of(1, 2, Sort.by("price"));
+        PageRequest pageable = PageRequest.of(1, 2, Sort.by("price", "id"));
         when(itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase("мол", "мол", pageable))
                 .thenReturn(new PageImpl<>(List.of(milk), pageable, 3));
         when(cartItemRepository.findAll()).thenReturn(List.of());
@@ -69,7 +69,7 @@ class ItemServiceTest {
 
     @Test
     void findItems_sortByAlpha_sortsByTitle() {
-        PageRequest pageable = PageRequest.of(0, 5, Sort.by("title"));
+        PageRequest pageable = PageRequest.of(0, 5, Sort.by("title", "id"));
         when(itemRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(), pageable, 0));
         when(cartItemRepository.findAll()).thenReturn(List.of());
 

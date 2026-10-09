@@ -71,8 +71,8 @@ public class ItemService {
     private Sort toSort(SortType sort) {
         return switch (sort) {
             case NO -> Sort.unsorted();
-            case ALPHA -> Sort.by("title");
-            case PRICE -> Sort.by("price");
+            case ALPHA -> Sort.by("title", "id");
+            case PRICE -> Sort.by("price", "id");
         };
     }
 
