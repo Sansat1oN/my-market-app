@@ -3,12 +3,15 @@ package ru.yandex.practicum.mymarket.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.mymarket.dto.CartAction;
+import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,6 +23,24 @@ public class CartService {
     public CartService(CartItemRepository cartItemRepository, ItemRepository itemRepository) {
         this.cartItemRepository = cartItemRepository;
         this.itemRepository = itemRepository;
+    }
+
+    public List<ItemDto> findItems() {
+        List<ItemDto> items = new ArrayList<>();
+        for (CartItem cartItem : cartItemRepository.findAll()) {
+            Item item = cartItem.getItem();
+            items.add(new ItemDto(item.getId(), item.getTitle(), item.getDescription(), item.getImgPath(),
+                    item.getPrice(), cartItem.getCount()));
+        }
+        return items;
+    }
+
+    public long calculateTotal(List<ItemDto> items) {
+        long total = 0;
+        for (ItemDto item : items) {
+            total += item.price() * item.count();
+        }
+        return total;
     }
 
     @Transactional
