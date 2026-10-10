@@ -1,13 +1,9 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.service.CartService;
 
 import java.util.List;
 
@@ -19,14 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-@WebMvcTest(CartController.class)
-class CartControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private CartService cartService;
+class CartControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getCart_returnsItemsAndTotal() throws Exception {

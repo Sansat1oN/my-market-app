@@ -1,19 +1,14 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.Paging;
 import ru.yandex.practicum.mymarket.dto.SortType;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
-import ru.yandex.practicum.mymarket.service.CartService;
-import ru.yandex.practicum.mymarket.service.ItemService;
 
 import java.util.List;
 
@@ -26,17 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-@WebMvcTest(ItemController.class)
-class ItemControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private ItemService itemService;
-
-    @MockitoBean
-    private CartService cartService;
+class ItemControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getItems_withoutParams_usesDefaults() throws Exception {
