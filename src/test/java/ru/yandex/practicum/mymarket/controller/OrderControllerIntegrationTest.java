@@ -54,6 +54,15 @@ class OrderControllerIntegrationTest extends AbstractTest {
     }
 
     @Test
+    void buy_emptyCart_redirectsToCartWithoutOrder() throws Exception {
+        mockMvc.perform(post("/buy"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/cart/items"));
+
+        assertEquals(List.of(), orderService.findOrders());
+    }
+
+    @Test
     void getOrders_returnsOrders() throws Exception {
         fillCart();
         long id = orderService.buy();

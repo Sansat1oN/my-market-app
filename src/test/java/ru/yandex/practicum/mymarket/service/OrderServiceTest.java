@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
+import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +86,15 @@ class OrderServiceTest {
         assertEquals(100L, orderItems.get(0).getPrice());
         assertEquals(2, orderItems.get(0).getCount());
         verify(cartItemRepository).deleteAll();
+    }
+
+    @Test
+    void buy_emptyCart_throwsEmptyCartException() {
+        when(cartItemRepository.findAll()).thenReturn(List.of());
+
+        assertThrows(EmptyCartException.class, () -> orderService.buy());
+
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     private Order order(long id) {

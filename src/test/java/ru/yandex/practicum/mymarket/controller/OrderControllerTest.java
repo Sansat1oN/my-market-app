@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
+import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 
 import java.util.List;
@@ -67,6 +68,15 @@ class OrderControllerTest extends AbstractControllerMockTest {
         mockMvc.perform(post("/buy"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/orders/5?newOrder=true"));
+    }
+
+    @Test
+    void buy_emptyCart_redirectsToCart() throws Exception {
+        when(orderService.buy()).thenThrow(new EmptyCartException("Корзина пуста"));
+
+        mockMvc.perform(post("/buy"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/cart/items"));
     }
 
     private OrderDto order(long id) {

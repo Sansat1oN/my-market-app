@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.service.OrderService;
 
 @Controller
@@ -35,7 +36,12 @@ public class OrderController {
 
     @PostMapping("/buy")
     public String buy(RedirectAttributes redirectAttributes) {
-        long id = orderService.buy();
+        long id;
+        try {
+            id = orderService.buy();
+        } catch (EmptyCartException e) {
+            return "redirect:/cart/items";
+        }
         redirectAttributes.addAttribute("id", id);
         redirectAttributes.addAttribute("newOrder", true);
         return "redirect:/orders/{id}";

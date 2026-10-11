@@ -21,4 +21,14 @@ class ImageServiceTest {
     void findImage_imageNotFound_throwsNotFoundException() {
         assertThrows(NotFoundException.class, () -> imageService.findImage("ololo.jpg"));
     }
+
+    @Test
+    void findImage_nameWithPathTraversal_throwsNotFoundException() {
+        assertThrows(NotFoundException.class, () -> imageService.findImage("../application.properties"));
+    }
+
+    @Test
+    void findImage_nameWithoutJpgExtension_throwsNotFoundException() {
+        assertThrows(NotFoundException.class, () -> imageService.findImage("milk"));
+    }
 }

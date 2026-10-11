@@ -48,10 +48,9 @@ java -jar target/my-market-app-0.0.1-SNAPSHOT.jar
 
 ## Запуск в Docker
 
-Сначала собрать jar, затем образ:
+Jar собирается внутри образа, заранее собирать его не нужно:
 
 ```
-mvn clean package
 docker build -t my-market-app .
 docker run -p 8080:8080 my-market-app
 ```

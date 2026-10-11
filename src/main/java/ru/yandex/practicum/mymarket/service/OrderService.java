@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
+import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
@@ -44,8 +45,12 @@ public class OrderService {
 
     @Transactional
     public long buy() {
+        List<CartItem> cartItems = cartItemRepository.findAll();
+        if (cartItems.isEmpty()) {
+            throw new EmptyCartException("Корзина пуста");
+        }
         Order order = new Order();
-        for (CartItem cartItem : cartItemRepository.findAll()) {
+        for (CartItem cartItem : cartItems) {
             Item item = cartItem.getItem();
             order.addItem(item, item.getPrice(), cartItem.getCount());
         }
