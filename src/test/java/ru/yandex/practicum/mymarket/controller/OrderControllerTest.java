@@ -1,6 +1,9 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
@@ -9,74 +12,91 @@ import ru.yandex.practicum.mymarket.exception.NotFoundException;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
-    void getOrders_returnsOrders() throws Exception {
-        List<OrderDto> orders = List.of(order(1L), order(2L));
-        when(orderService.findOrders()).thenReturn(orders);
+    void getOrders_returnsOrders() {
+        when(orderService.findOrders()).thenReturn(Flux.just(order(1L), order(2L)));
 
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("orders"))
-                .andExpect(model().attribute("orders", orders));
+        webTestClient.get()
+                .uri("/orders")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_HTML)
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Заказ №1"));
+                    assertTrue(html.contains("Заказ №2"));
+                    assertTrue(html.contains("Товар 1 (2 шт.) 200 руб."));
+                    assertTrue(html.contains("Сумма: 200 руб."));
+                });
     }
 
     @Test
-    void getOrder_withoutNewOrder_returnsOrderAndFalse() throws Exception {
-        when(orderService.findOrder(1L)).thenReturn(order(1L));
+    void getOrder_withoutNewOrder_returnsOrderWithoutCongratulation() {
+        when(orderService.findOrder(1L)).thenReturn(Mono.just(order(1L)));
 
-        mockMvc.perform(get("/orders/{id}", 1L))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attribute("order", order(1L)))
-                .andExpect(model().attribute("newOrder", false));
+        webTestClient.get()
+                .uri("/orders/{id}", 1L)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Заказ №1"));
+                    assertTrue(html.contains("Сумма: 200 руб."));
+                    assertFalse(html.contains("Поздравляем"));
+                });
     }
 
     @Test
-    void getOrder_newOrder_returnsOrderAndTrue() throws Exception {
-        when(orderService.findOrder(1L)).thenReturn(order(1L));
+    void getOrder_newOrder_returnsOrderWithCongratulation() {
+        when(orderService.findOrder(1L)).thenReturn(Mono.just(order(1L)));
 
-        mockMvc.perform(get("/orders/{id}", 1L)
-                        .param("newOrder", "true"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attribute("order", order(1L)))
-                .andExpect(model().attribute("newOrder", true));
+        webTestClient.get()
+                .uri("/orders/{id}?newOrder=true", 1L)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Заказ №1"));
+                    assertTrue(html.contains("Поздравляем"));
+                });
     }
 
     @Test
-    void getOrder_orderNotFound_404() throws Exception {
-        when(orderService.findOrder(100L)).thenThrow(new NotFoundException("Заказ не найден: 100"));
+    void getOrder_orderNotFound_404() {
+        when(orderService.findOrder(100L)).thenReturn(Mono.error(new NotFoundException("Заказ не найден: 100")));
 
-        mockMvc.perform(get("/orders/{id}", 100L))
-                .andExpect(status().isNotFound());
+        webTestClient.get()
+                .uri("/orders/{id}", 100L)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
-    void buy_redirectsToNewOrder() throws Exception {
-        when(orderService.buy()).thenReturn(5L);
+    void buy_redirectsToNewOrder() {
+        when(orderService.buy()).thenReturn(Mono.just(5L));
 
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/5?newOrder=true"));
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/orders/5?newOrder=true");
     }
 
     @Test
-    void buy_emptyCart_redirectsToCart() throws Exception {
-        when(orderService.buy()).thenThrow(new EmptyCartException("Корзина пуста"));
+    void buy_emptyCart_redirectsToCart() {
+        when(orderService.buy()).thenReturn(Mono.error(new EmptyCartException("Корзина пуста")));
 
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/cart/items"));
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
     }
 
     private OrderDto order(long id) {

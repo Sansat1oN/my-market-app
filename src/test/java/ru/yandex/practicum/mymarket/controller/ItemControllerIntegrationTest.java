@@ -1,102 +1,116 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.BodyInserters;
 import ru.yandex.practicum.mymarket.AbstractTest;
-import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.dto.Paging;
 
-import java.util.List;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItemControllerIntegrationTest extends AbstractTest {
 
     @Test
-    void getItems_withoutParams_returnsFirstPage() throws Exception {
-        mockMvc.perform(get("/items"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("items"))
-                .andExpect(model().attribute("sort", "NO"))
-                .andExpect(model().attribute("paging", new Paging(5, 1, false, true)));
+    void getItems_withoutParams_returnsFirstPage() {
+        webTestClient.get()
+                .uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_HTML)
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("Масса творожная РОСТАГРОЭКСПОРТ Особая"));
+                    assertFalse(html.contains("Йогурт TEOS Греческий натуральный"));
+                    assertTrue(html.contains("<option value=\"NO\" selected=\"selected\">"));
+                    assertTrue(html.contains("Страница: 1"));
+                    assertFalse(html.contains("&larr;"));
+                    assertTrue(html.contains("&rarr;"));
+                });
     }
 
     @Test
-    void getItems_search_returnsFoundItems() throws Exception {
-        mockMvc.perform(get("/items")
-                        .param("search", "кефир"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("items"))
-                .andExpect(model().attribute("items", List.of(List.of(kefir(0), stub(), stub()))))
-                .andExpect(model().attribute("search", "кефир"))
-                .andExpect(model().attribute("paging", new Paging(5, 1, false, false)));
+    void getItems_search_returnsFoundItems() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/items")
+                        .queryParam("search", "кефир")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Кефир ПРОСТОКВАШИНО"));
+                    assertFalse(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("value=\"кефир\""));
+                    assertFalse(html.contains("&rarr;"));
+                });
     }
 
     @Test
-    void getItems_sortByPrice_returnsCheapestItems() throws Exception {
-        mockMvc.perform(get("/items")
-                        .param("sort", "PRICE")
-                        .param("pageSize", "2"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("items", List.of(List.of(milk(0), yogurt(0), stub()))))
-                .andExpect(model().attribute("sort", "PRICE"))
-                .andExpect(model().attribute("paging", new Paging(2, 1, false, true)));
+    void getItems_sortByPrice_returnsCheapestItems() {
+        webTestClient.get()
+                .uri("/items?sort=PRICE&pageSize=2")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("Йогурт TEOS Греческий натуральный"));
+                    assertFalse(html.contains("Кефир ПРОСТОКВАШИНО"));
+                    assertTrue(html.contains("<option value=\"PRICE\" selected=\"selected\">"));
+                    assertTrue(html.contains("&rarr;"));
+                });
     }
 
     @Test
-    void changeCountOnItems_plus_addsItemToCart() throws Exception {
-        mockMvc.perform(post("/items")
-                        .param("id", "1")
-                        .param("pageSize", "10")
-                        .param("action", "PLUS"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/items?sort=NO&pageNumber=1&pageSize=10"));
+    void changeCountOnItems_plus_addsItemToCart() {
+        webTestClient.post()
+                .uri("/items")
+                .body(BodyInserters.fromFormData("id", "1")
+                        .with("search", "")
+                        .with("sort", "NO")
+                        .with("pageNumber", "1")
+                        .with("pageSize", "10")
+                        .with("action", "PLUS"))
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/items?search=&sort=NO&pageNumber=1&pageSize=10");
 
-        mockMvc.perform(get("/items/{id}", 1L))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attribute("item", milk(1)));
+        webTestClient.get()
+                .uri("/items/{id}", 1L)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertTrue(html.contains("<span>1</span>")));
     }
 
     @Test
-    void changeCountOnItem_plusAndMinus_changesCount() throws Exception {
-        mockMvc.perform(post("/items/{id}", 1L)
-                        .param("action", "PLUS"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attribute("item", milk(1)));
+    void changeCountOnItem_plusAndMinus_changesCount() {
+        webTestClient.post()
+                .uri("/items/{id}", 1L)
+                .body(BodyInserters.fromFormData("action", "PLUS"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("<span>1</span>"));
+                });
 
-        mockMvc.perform(post("/items/{id}", 1L)
-                        .param("action", "MINUS"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("item", milk(0)));
+        webTestClient.post()
+                .uri("/items/{id}", 1L)
+                .body(BodyInserters.fromFormData("action", "MINUS"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertTrue(html.contains("<span>0</span>")));
     }
 
     @Test
-    void getItem_itemNotFound_404() throws Exception {
-        mockMvc.perform(get("/items/{id}", 100L))
-                .andExpect(status().isNotFound());
-    }
-
-    private ItemDto milk(int count) {
-        return new ItemDto(1L, "Молоко ЛЕНТА пастеризованное", "Молоко питьевое пастеризованное 2,5%, 900 мл",
-                "images/milk.jpg", 50L, count);
-    }
-
-    private ItemDto kefir(int count) {
-        return new ItemDto(2L, "Кефир ПРОСТОКВАШИНО", "Кефир 2,5%, без змж, 930 г", "images/kefir.jpg", 95L, count);
-    }
-
-    private ItemDto yogurt(int count) {
-        return new ItemDto(6L, "Йогурт TEOS Греческий натуральный", "Йогурт греческий 2%, без змж, 250 г",
-                "images/yogurt.jpg", 80L, count);
-    }
-
-    private ItemDto stub() {
-        return new ItemDto(-1, null, null, null, 0, 0);
+    void getItem_itemNotFound_404() {
+        webTestClient.get()
+                .uri("/items/{id}", 100L)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

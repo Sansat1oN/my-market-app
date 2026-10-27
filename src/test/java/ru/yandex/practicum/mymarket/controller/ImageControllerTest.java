@@ -2,32 +2,36 @@ package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ImageControllerTest extends AbstractControllerMockTest {
 
     @Test
-    void getImage_returnsImage() throws Exception {
+    void getImage_returnsImage() {
         byte[] bytes = {1, 2, 3};
-        when(imageService.findImage("milk.jpg")).thenReturn(bytes);
+        when(imageService.findImage("milk.jpg")).thenReturn(Mono.just(bytes));
 
-        mockMvc.perform(get("/images/{name}", "milk.jpg"))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.IMAGE_JPEG))
-                .andExpect(content().bytes(bytes));
+        webTestClient.get()
+                .uri("/images/{name}", "milk.jpg")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.IMAGE_JPEG)
+                .expectBody(byte[].class)
+                .isEqualTo(bytes);
     }
 
     @Test
-    void getImage_imageNotFound_404() throws Exception {
-        when(imageService.findImage("ololo.jpg")).thenThrow(new NotFoundException("Изображение не найдено: ololo.jpg"));
+    void getImage_imageNotFound_404() {
+        when(imageService.findImage("ololo.jpg"))
+                .thenReturn(Mono.error(new NotFoundException("Изображение не найдено: ololo.jpg")));
 
-        mockMvc.perform(get("/images/{name}", "ololo.jpg"))
-                .andExpect(status().isNotFound());
+        webTestClient.get()
+                .uri("/images/{name}", "ololo.jpg")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

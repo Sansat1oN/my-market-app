@@ -2,15 +2,14 @@ package ru.yandex.practicum.mymarket.repository;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import ru.yandex.practicum.mymarket.AbstractRepositoryTest;
 import ru.yandex.practicum.mymarket.model.Item;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItemRepositoryTest extends AbstractRepositoryTest {
 
@@ -18,13 +17,13 @@ class ItemRepositoryTest extends AbstractRepositoryTest {
     private ItemRepository itemRepository;
 
     @Test
-    void findAll_returnsItemsLoadedFromCsv() {
-        assertEquals(10, itemRepository.findAll().size());
+    void count_returnsItemsLoadedFromDataSql() {
+        assertEquals(10L, itemRepository.count().block());
     }
 
     @Test
-    void findById_returnsItemLoadedFromCsv() {
-        Item item = itemRepository.findById(1L).orElseThrow();
+    void findById_returnsItemLoadedFromDataSql() {
+        Item item = itemRepository.findById(1L).block();
 
         assertEquals("Молоко ЛЕНТА пастеризованное", item.getTitle());
         assertEquals("Молоко питьевое пастеризованное 2,5%, 900 мл", item.getDescription());
@@ -34,38 +33,45 @@ class ItemRepositoryTest extends AbstractRepositoryTest {
 
     @Test
     void search_byTitleIgnoreCase_returnsMatchingItems() {
-        Page<Item> page = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                "простоквашино", "простоквашино", PageRequest.of(0, 10));
+        List<Item> items = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                "простоквашино", "простоквашино", PageRequest.of(0, 10)).collectList().block();
 
-        assertEquals(3, page.getTotalElements());
+        assertEquals(3, items.size());
+        assertEquals(3L, itemRepository.countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                "простоквашино", "простоквашино").block());
     }
 
     @Test
     void search_byDescription_returnsMatchingItems() {
-        Page<Item> page = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                "изюм", "изюм", PageRequest.of(0, 10));
+        List<Item> items = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                "изюм", "изюм", PageRequest.of(0, 10)).collectList().block();
 
-        assertEquals(1, page.getTotalElements());
-        assertEquals("Масса творожная РОСТАГРОЭКСПОРТ Особая", page.getContent().get(0).getTitle());
+        assertEquals(1, items.size());
+        assertEquals("Масса творожная РОСТАГРОЭКСПОРТ Особая", items.get(0).getTitle());
     }
 
     @Test
-    void findAll_sortedByPrice_returnsFirstPage() {
-        Page<Item> page = itemRepository.findAll(PageRequest.of(0, 5, Sort.by("price")));
+    void search_returnsRequestedPage() {
+        List<Item> items = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                "простоквашино", "простоквашино", PageRequest.of(1, 2, Sort.by("title"))).collectList().block();
 
-        assertEquals(5, page.getContent().size());
-        assertEquals(50L, page.getContent().get(0).getPrice());
-        assertFalse(page.hasPrevious());
-        assertTrue(page.hasNext());
+        assertEquals(1, items.size());
+        assertEquals("Творог ПРОСТОКВАШИНО", items.get(0).getTitle());
     }
 
     @Test
-    void findAll_sortedByTitle_returnsLastPage() {
-        Page<Item> page = itemRepository.findAll(PageRequest.of(1, 5, Sort.by("title")));
+    void findAllBy_sortedByPrice_returnsFirstPage() {
+        List<Item> items = itemRepository.findAllBy(PageRequest.of(0, 5, Sort.by("price"))).collectList().block();
 
-        assertEquals(5, page.getContent().size());
-        assertEquals("Творог ПРОСТОКВАШИНО", page.getContent().get(4).getTitle());
-        assertTrue(page.hasPrevious());
-        assertFalse(page.hasNext());
+        assertEquals(5, items.size());
+        assertEquals(50L, items.get(0).getPrice());
+    }
+
+    @Test
+    void findAllBy_sortedByTitle_returnsLastPage() {
+        List<Item> items = itemRepository.findAllBy(PageRequest.of(1, 5, Sort.by("title"))).collectList().block();
+
+        assertEquals(5, items.size());
+        assertEquals("Творог ПРОСТОКВАШИНО", items.get(4).getTitle());
     }
 }
