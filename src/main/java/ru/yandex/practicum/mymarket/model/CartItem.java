@@ -1,32 +1,23 @@
 package ru.yandex.practicum.mymarket.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "cart_items")
+@Table("cart_items")
 public class CartItem {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "item_id")
-    private Item item;
+    private Long itemId;
 
     private int count;
 
     protected CartItem() {
     }
 
-    public CartItem(Item item, int count) {
-        this.item = item;
+    public CartItem(Long itemId, int count) {
+        this.itemId = itemId;
         this.count = count;
     }
 
@@ -34,8 +25,8 @@ public class CartItem {
         return id;
     }
 
-    public Item getItem() {
-        return item;
+    public Long getItemId() {
+        return itemId;
     }
 
     public int getCount() {
