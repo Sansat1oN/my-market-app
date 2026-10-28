@@ -3,13 +3,11 @@ package ru.yandex.practicum.mymarket.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import ru.yandex.practicum.mymarket.dto.CartAction;
-import ru.yandex.practicum.mymarket.dto.ItemDto;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.CartForm;
 import ru.yandex.practicum.mymarket.service.CartService;
-
-import java.util.List;
 
 @Controller
 public class CartController {
@@ -21,23 +19,23 @@ public class CartController {
     }
 
     @GetMapping("/cart/items")
-    public String getCart(Model model) {
-        addCartToModel(model);
-        return "cart";
+    public Mono<String> getCart(Model model) {
+        return showCart(model);
     }
 
     @PostMapping("/cart/items")
-    public String changeCountOnCart(@RequestParam(name = "id") long id,
-                                    @RequestParam(name = "action") CartAction action,
-                                    Model model) {
-        cartService.changeCount(id, action);
-        addCartToModel(model);
-        return "cart";
+    public Mono<String> changeCountOnCart(@ModelAttribute CartForm form, Model model) {
+        return cartService.changeCount(form.id(), form.action())
+                .then(showCart(model));
     }
 
-    private void addCartToModel(Model model) {
-        List<ItemDto> items = cartService.findItems();
-        model.addAttribute("items", items);
-        model.addAttribute("total", cartService.calculateTotal(items));
+    private Mono<String> showCart(Model model) {
+        return cartService.findItems()
+                .collectList()
+                .map(items -> {
+                    model.addAttribute("items", items);
+                    model.addAttribute("total", cartService.calculateTotal(items));
+                    return "cart";
+                });
     }
 }

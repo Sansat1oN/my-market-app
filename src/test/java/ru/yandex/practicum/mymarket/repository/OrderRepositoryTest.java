@@ -3,31 +3,34 @@ package ru.yandex.practicum.mymarket.repository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.yandex.practicum.mymarket.AbstractRepositoryTest;
-import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.model.Order;
 import ru.yandex.practicum.mymarket.model.OrderItem;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class OrderRepositoryTest extends AbstractRepositoryTest {
 
     @Autowired
     private OrderRepository orderRepository;
 
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+
     @Test
     void save_savesOrderWithItems() {
-        Order order = new Order();
-        order.addItem(entityManager.find(Item.class, 1L), 50L, 2);
-        order.addItem(entityManager.find(Item.class, 2L), 95L, 1);
-        Long id = orderRepository.save(order).getId();
-        entityManager.flush();
-        entityManager.clear();
+        Long id = orderRepository.save(new Order()).block().getId();
+        orderItemRepository.save(new OrderItem(id, 1L, 50L, 2)).block();
+        orderItemRepository.save(new OrderItem(id, 2L, 95L, 1)).block();
 
-        Order saved = orderRepository.findById(id).orElseThrow();
+        List<OrderItem> items = orderItemRepository.findByOrderId(id).collectList().block();
 
-        assertEquals(2, saved.getItems().size());
+        assertNotNull(orderRepository.findById(id).block());
+        assertEquals(2, items.size());
         long totalSum = 0;
-        for (OrderItem orderItem : saved.getItems()) {
+        for (OrderItem orderItem : items) {
             totalSum += orderItem.getPrice() * orderItem.getCount();
         }
         assertEquals(195L, totalSum);

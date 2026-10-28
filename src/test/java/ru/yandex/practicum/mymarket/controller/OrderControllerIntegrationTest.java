@@ -12,12 +12,7 @@ import ru.yandex.practicum.mymarket.service.OrderService;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OrderControllerIntegrationTest extends AbstractTest {
 
@@ -28,74 +23,95 @@ class OrderControllerIntegrationTest extends AbstractTest {
     private OrderService orderService;
 
     @Test
-    void buy_createsOrderAndClearsCart() throws Exception {
+    void buy_createsOrderAndClearsCart() {
         fillCart();
 
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection());
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection();
 
-        List<OrderDto> orders = orderService.findOrders();
+        List<OrderDto> orders = orderService.findOrders().collectList().block();
         assertEquals(1, orders.size());
         assertEquals(List.of(milk(), kefir()), orders.get(0).items());
         assertEquals(195L, orders.get(0).totalSum());
-        assertEquals(List.of(), cartService.findItems());
+        assertEquals(List.of(), cartService.findItems().collectList().block());
     }
 
     @Test
-    void buy_redirectsToNewOrder() throws Exception {
+    void buy_redirectsToNewOrder() {
         fillCart();
 
-        String url = mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection())
-                .andReturn().getResponse().getRedirectedUrl();
+        String url = webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .returnResult(Void.class)
+                .getResponseHeaders().getLocation().toString();
 
-        long id = orderService.findOrders().get(0).id();
+        long id = orderService.findOrders().blockFirst().id();
         assertEquals("/orders/" + id + "?newOrder=true", url);
     }
 
     @Test
-    void buy_emptyCart_redirectsToCartWithoutOrder() throws Exception {
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/cart/items"));
+    void buy_emptyCart_redirectsToCartWithoutOrder() {
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
 
-        assertEquals(List.of(), orderService.findOrders());
+        assertEquals(List.of(), orderService.findOrders().collectList().block());
     }
 
     @Test
-    void getOrders_returnsOrders() throws Exception {
+    void getOrders_returnsOrders() {
         fillCart();
-        long id = orderService.buy();
+        long id = orderService.buy().block();
 
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("orders"))
-                .andExpect(model().attribute("orders", List.of(new OrderDto(id, List.of(milk(), kefir()), 195L))));
+        webTestClient.get()
+                .uri("/orders")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Заказ №" + id));
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное (2 шт.) 100 руб."));
+                    assertTrue(html.contains("Кефир ПРОСТОКВАШИНО (1 шт.) 95 руб."));
+                    assertTrue(html.contains("Сумма: 195 руб."));
+                });
     }
 
     @Test
-    void getOrder_newOrder_returnsOrderAndTrue() throws Exception {
+    void getOrder_newOrder_returnsOrderWithCongratulation() {
         fillCart();
-        long id = orderService.buy();
+        long id = orderService.buy().block();
 
-        mockMvc.perform(get("/orders/{id}", id)
-                        .param("newOrder", "true"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attribute("order", new OrderDto(id, List.of(milk(), kefir()), 195L)))
-                .andExpect(model().attribute("newOrder", true));
+        webTestClient.get()
+                .uri("/orders/{id}?newOrder=true", id)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("Поздравляем"));
+                    assertTrue(html.contains("Заказ №" + id));
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("Сумма: 195 руб."));
+                });
     }
 
     @Test
-    void getOrder_orderNotFound_404() throws Exception {
-        mockMvc.perform(get("/orders/{id}", 100000L))
-                .andExpect(status().isNotFound());
+    void getOrder_orderNotFound_404() {
+        webTestClient.get()
+                .uri("/orders/{id}", 100000L)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     private void fillCart() {
-        cartService.changeCount(1L, CartAction.PLUS);
-        cartService.changeCount(1L, CartAction.PLUS);
-        cartService.changeCount(2L, CartAction.PLUS);
+        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount(2L, CartAction.PLUS).block();
     }
 
     private ItemDto milk() {

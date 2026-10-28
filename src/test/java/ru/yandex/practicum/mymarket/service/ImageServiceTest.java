@@ -12,23 +12,23 @@ class ImageServiceTest {
 
     @Test
     void findImage_returnsImageBytes() {
-        byte[] image = imageService.findImage("milk.jpg");
+        byte[] image = imageService.findImage("milk.jpg").block();
 
         assertTrue(image.length > 0);
     }
 
     @Test
     void findImage_imageNotFound_throwsNotFoundException() {
-        assertThrows(NotFoundException.class, () -> imageService.findImage("ololo.jpg"));
+        assertThrows(NotFoundException.class, () -> imageService.findImage("ololo.jpg").block());
     }
 
     @Test
     void findImage_nameWithPathTraversal_throwsNotFoundException() {
-        assertThrows(NotFoundException.class, () -> imageService.findImage("../application.properties"));
+        assertThrows(NotFoundException.class, () -> imageService.findImage("../application.properties").block());
     }
 
     @Test
     void findImage_nameWithoutJpgExtension_throwsNotFoundException() {
-        assertThrows(NotFoundException.class, () -> imageService.findImage("milk"));
+        assertThrows(NotFoundException.class, () -> imageService.findImage("milk").block());
     }
 }

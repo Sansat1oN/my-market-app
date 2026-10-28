@@ -1,10 +1,13 @@
 package ru.yandex.practicum.mymarket.service;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.SortType;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
@@ -14,7 +17,6 @@ import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,28 +34,37 @@ public class ItemService {
         this.cartItemRepository = cartItemRepository;
     }
 
-    public Page<ItemDto> findItems(String search, SortType sort, int pageNumber, int pageSize) {
+    public Mono<Page<ItemDto>> findItems(String search, SortType sort, int pageNumber, int pageSize) {
         Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, toSort(sort));
-        Page<Item> items;
+        Flux<Item> items;
+        Mono<Long> total;
         if (search == null || search.isBlank()) {
-            items = itemRepository.findAll(pageable);
+            items = itemRepository.findAllBy(pageable);
+            total = itemRepository.count();
         } else {
             items = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search, pageable);
+            total = itemRepository.countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search);
         }
-        Map<Long, Integer> counts = new HashMap<>();
-        for (CartItem cartItem : cartItemRepository.findAll()) {
-            counts.put(cartItem.getItem().getId(), cartItem.getCount());
-        }
-        return items.map(item -> toDto(item, counts.getOrDefault(item.getId(), 0)));
+        Mono<Map<Long, Integer>> counts = cartItemRepository.findAll()
+                .collectMap(CartItem::getItemId, CartItem::getCount);
+        return Mono.zip(items.collectList(), total, counts)
+                .map(result -> {
+                    List<ItemDto> content = new ArrayList<>();
+                    for (Item item : result.getT1()) {
+                        content.add(toDto(item, result.getT3().getOrDefault(item.getId(), 0)));
+                    }
+                    return new PageImpl<>(content, pageable, result.getT2());
+                });
     }
 
-    public ItemDto findItem(long id) {
-        Item item = itemRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Товар не найден: " + id));
-        int count = cartItemRepository.findByItemId(id)
+    public Mono<ItemDto> findItem(long id) {
+        Mono<Item> item = itemRepository.findById(id)
+                .switchIfEmpty(Mono.error(new NotFoundException("Товар не найден: " + id)));
+        Mono<Integer> count = cartItemRepository.findByItemId(id)
                 .map(CartItem::getCount)
-                .orElse(0);
-        return toDto(item, count);
+                .defaultIfEmpty(0);
+        return Mono.zip(item, count)
+                .map(result -> toDto(result.getT1(), result.getT2()));
     }
 
     public List<List<ItemDto>> splitIntoRows(List<ItemDto> items) {

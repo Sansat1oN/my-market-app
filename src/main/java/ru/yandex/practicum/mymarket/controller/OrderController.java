@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.service.OrderService;
 
@@ -20,30 +20,31 @@ public class OrderController {
     }
 
     @GetMapping("/orders")
-    public String getOrders(Model model) {
-        model.addAttribute("orders", orderService.findOrders());
-        return "orders";
+    public Mono<String> getOrders(Model model) {
+        return orderService.findOrders()
+                .collectList()
+                .map(orders -> {
+                    model.addAttribute("orders", orders);
+                    return "orders";
+                });
     }
 
     @GetMapping("/orders/{id}")
-    public String getOrder(@PathVariable(name = "id") long id,
-                           @RequestParam(name = "newOrder", defaultValue = "false") boolean newOrder,
-                           Model model) {
-        model.addAttribute("order", orderService.findOrder(id));
-        model.addAttribute("newOrder", newOrder);
-        return "order";
+    public Mono<String> getOrder(@PathVariable(name = "id") long id,
+                                 @RequestParam(name = "newOrder", defaultValue = "false") boolean newOrder,
+                                 Model model) {
+        return orderService.findOrder(id)
+                .map(order -> {
+                    model.addAttribute("order", order);
+                    model.addAttribute("newOrder", newOrder);
+                    return "order";
+                });
     }
 
     @PostMapping("/buy")
-    public String buy(RedirectAttributes redirectAttributes) {
-        long id;
-        try {
-            id = orderService.buy();
-        } catch (EmptyCartException e) {
-            return "redirect:/cart/items";
-        }
-        redirectAttributes.addAttribute("id", id);
-        redirectAttributes.addAttribute("newOrder", true);
-        return "redirect:/orders/{id}";
+    public Mono<String> buy() {
+        return orderService.buy()
+                .map(id -> "redirect:/orders/" + id + "?newOrder=true")
+                .onErrorResume(EmptyCartException.class, e -> Mono.just("redirect:/cart/items"));
     }
 }

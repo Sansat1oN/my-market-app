@@ -4,6 +4,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.service.ImageService;
 
 @RestController
@@ -16,7 +17,7 @@ public class ImageController {
     }
 
     @GetMapping(value = "/images/{name}", produces = MediaType.IMAGE_JPEG_VALUE)
-    public byte[] getImage(@PathVariable(name = "name") String name) {
+    public Mono<byte[]> getImage(@PathVariable(name = "name") String name) {
         return imageService.findImage(name);
     }
 }

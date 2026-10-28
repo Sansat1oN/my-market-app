@@ -2,72 +2,85 @@ package ru.yandex.practicum.mymarket.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
-import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.model.Order;
 import ru.yandex.practicum.mymarket.model.OrderItem;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
+import ru.yandex.practicum.mymarket.repository.ItemRepository;
+import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final CartItemRepository cartItemRepository;
+    private final ItemRepository itemRepository;
 
-    public OrderService(OrderRepository orderRepository, CartItemRepository cartItemRepository) {
+    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
+                        CartItemRepository cartItemRepository, ItemRepository itemRepository) {
         this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
+        this.itemRepository = itemRepository;
     }
 
     @Transactional(readOnly = true)
-    public List<OrderDto> findOrders() {
-        List<OrderDto> orders = new ArrayList<>();
-        for (Order order : orderRepository.findAll()) {
-            orders.add(toDto(order));
-        }
-        return orders;
+    public Flux<OrderDto> findOrders() {
+        return orderRepository.findAll()
+                .concatMap(this::toDto);
     }
 
     @Transactional(readOnly = true)
-    public OrderDto findOrder(long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Заказ не найден: " + id));
-        return toDto(order);
+    public Mono<OrderDto> findOrder(long id) {
+        return orderRepository.findById(id)
+                .switchIfEmpty(Mono.error(new NotFoundException("Заказ не найден: " + id)))
+                .flatMap(this::toDto);
     }
 
     @Transactional
-    public long buy() {
-        List<CartItem> cartItems = cartItemRepository.findAll();
-        if (cartItems.isEmpty()) {
-            throw new EmptyCartException("Корзина пуста");
-        }
-        Order order = new Order();
-        for (CartItem cartItem : cartItems) {
-            Item item = cartItem.getItem();
-            order.addItem(item, item.getPrice(), cartItem.getCount());
-        }
-        Order saved = orderRepository.save(order);
-        cartItemRepository.deleteAll();
-        return saved.getId();
+    public Mono<Long> buy() {
+        return cartItemRepository.findAll()
+                .collectList()
+                .flatMap(cartItems -> {
+                    if (cartItems.isEmpty()) {
+                        return Mono.error(new EmptyCartException("Корзина пуста"));
+                    }
+                    return orderRepository.save(new Order())
+                            .flatMap(order -> saveOrderItems(order, cartItems)
+                                    .then(cartItemRepository.deleteAll())
+                                    .thenReturn(order.getId()));
+                });
     }
 
-    private OrderDto toDto(Order order) {
-        List<ItemDto> items = new ArrayList<>();
-        long totalSum = 0;
-        for (OrderItem orderItem : order.getItems()) {
-            Item item = orderItem.getItem();
-            items.add(new ItemDto(item.getId(), item.getTitle(), item.getDescription(), item.getImgPath(),
-                    orderItem.getPrice(), orderItem.getCount()));
-            totalSum += orderItem.getPrice() * orderItem.getCount();
-        }
-        return new OrderDto(order.getId(), items, totalSum);
+    private Flux<OrderItem> saveOrderItems(Order order, List<CartItem> cartItems) {
+        return Flux.fromIterable(cartItems)
+                .concatMap(cartItem -> itemRepository.findById(cartItem.getItemId())
+                        .flatMap(item -> orderItemRepository.save(
+                                new OrderItem(order.getId(), item.getId(), item.getPrice(), cartItem.getCount()))));
+    }
+
+    private Mono<OrderDto> toDto(Order order) {
+        return orderItemRepository.findByOrderId(order.getId())
+                .concatMap(orderItem -> itemRepository.findById(orderItem.getItemId())
+                        .map(item -> new ItemDto(item.getId(), item.getTitle(), item.getDescription(), item.getImgPath(),
+                                orderItem.getPrice(), orderItem.getCount())))
+                .collectList()
+                .map(items -> {
+                    long totalSum = 0;
+                    for (ItemDto item : items) {
+                        totalSum += item.price() * item.count();
+                    }
+                    return new OrderDto(order.getId(), items, totalSum);
+                });
     }
 }
