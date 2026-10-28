@@ -67,14 +67,10 @@ class ItemControllerIntegrationTest extends AbstractTest {
         webTestClient.post()
                 .uri("/items")
                 .body(BodyInserters.fromFormData("id", "1")
-                        .with("search", "")
-                        .with("sort", "NO")
-                        .with("pageNumber", "1")
-                        .with("pageSize", "10")
                         .with("action", "PLUS"))
                 .exchange()
                 .expectStatus().is3xxRedirection()
-                .expectHeader().location("/items?search=&sort=NO&pageNumber=1&pageSize=10");
+                .expectHeader().location("/items?sort=NO&pageNumber=1&pageSize=5");
 
         webTestClient.get()
                 .uri("/items/{id}", 1L)
