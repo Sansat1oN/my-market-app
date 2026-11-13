@@ -1,10 +1,8 @@
 package ru.yandex.practicum.payment;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class PaymentServiceApplicationTests {
+class PaymentServiceApplicationTests extends AbstractTest {
 
 	@Test
 	void contextLoads() {
