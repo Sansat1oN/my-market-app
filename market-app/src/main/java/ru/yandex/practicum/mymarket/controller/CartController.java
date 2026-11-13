@@ -7,15 +7,19 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.CartForm;
+import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.service.CartService;
+import ru.yandex.practicum.mymarket.service.PaymentService;
 
 @Controller
 public class CartController {
 
     private final CartService cartService;
+    private final PaymentService paymentService;
 
-    public CartController(CartService cartService) {
+    public CartController(CartService cartService, PaymentService paymentService) {
         this.cartService = cartService;
+        this.paymentService = paymentService;
     }
 
     @GetMapping("/cart/items")
@@ -32,10 +36,25 @@ public class CartController {
     private Mono<String> showCart(Model model) {
         return cartService.findItems()
                 .collectList()
-                .map(items -> {
+                .flatMap(items -> {
                     model.addAttribute("items", items);
-                    model.addAttribute("total", cartService.calculateTotal(items));
-                    return "cart";
+                    long total = cartService.calculateTotal(items);
+                    model.addAttribute("total", total);
+                    if (items.isEmpty()) {
+                        return Mono.just("cart");
+                    }
+                    return paymentService.getBalance()
+                            .map(payment -> {
+                                boolean canBuy = payment.status() == PaymentStatus.SUCCESS
+                                        && payment.balance() >= total;
+                                model.addAttribute("canBuy", canBuy);
+                                if (payment.status() == PaymentStatus.UNAVAILABLE) {
+                                    model.addAttribute("paymentError", "Сервис платежей недоступен");
+                                } else if (!canBuy) {
+                                    model.addAttribute("paymentError", "Недостаточно средств");
+                                }
+                                return "cart";
+                            });
                 });
     }
 }

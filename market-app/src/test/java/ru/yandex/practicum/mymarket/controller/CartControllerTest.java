@@ -8,6 +8,8 @@ import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
+import ru.yandex.practicum.mymarket.dto.PaymentResult;
+import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 
 import java.util.List;
 
@@ -23,6 +25,8 @@ class CartControllerTest extends AbstractControllerMockTest {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
         when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
+        when(paymentService.getBalance()).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.get()
                 .uri("/cart/items")
@@ -34,6 +38,45 @@ class CartControllerTest extends AbstractControllerMockTest {
                     assertTrue(html.contains("Товар 1"));
                     assertTrue(html.contains("Товар 2"));
                     assertTrue(html.contains("Итого: 300 руб."));
+                    assertFalse(html.contains("disabled"));
+                });
+    }
+
+    @Test
+    void getCart_insufficientBalance_disablesBuyButton() {
+        List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
+        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.calculateTotal(items)).thenReturn(300L);
+        when(paymentService.getBalance()).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.SUCCESS, 299L)));
+
+        webTestClient.get()
+                .uri("/cart/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("disabled=\"disabled\""));
+                    assertTrue(html.contains("Недостаточно средств"));
+                });
+    }
+
+    @Test
+    void getCart_paymentServiceUnavailable_disablesBuyButtonAndShowsError() {
+        List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
+        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.calculateTotal(items)).thenReturn(300L);
+        when(paymentService.getBalance()).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
+
+        webTestClient.get()
+                .uri("/cart/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains("disabled=\"disabled\""));
+                    assertTrue(html.contains("Сервис платежей недоступен"));
                 });
     }
 
@@ -59,6 +102,8 @@ class CartControllerTest extends AbstractControllerMockTest {
         when(cartService.changeCount(1L, CartAction.PLUS)).thenReturn(Mono.empty());
         when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
+        when(paymentService.getBalance()).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.post()
                 .uri("/cart/items")

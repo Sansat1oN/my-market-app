@@ -12,6 +12,7 @@ import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.ImageService;
 import ru.yandex.practicum.mymarket.service.ItemService;
 import ru.yandex.practicum.mymarket.service.OrderService;
+import ru.yandex.practicum.mymarket.service.PaymentService;
 
 @WebFluxTest({ItemController.class, CartController.class, OrderController.class, ImageController.class})
 public abstract class AbstractControllerMockTest {
@@ -27,6 +28,9 @@ public abstract class AbstractControllerMockTest {
 
     @MockitoBean
     protected OrderService orderService;
+
+    @MockitoBean
+    protected PaymentService paymentService;
 
     @MockitoBean
     protected ImageService imageService;
