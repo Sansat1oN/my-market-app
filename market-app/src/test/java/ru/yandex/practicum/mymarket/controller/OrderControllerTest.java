@@ -2,18 +2,24 @@ package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.mockito.InOrder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractControllerMockTest;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
-import ru.yandex.practicum.mymarket.exception.EmptyCartException;
+import ru.yandex.practicum.mymarket.dto.PaymentResult;
+import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OrderControllerTest extends AbstractControllerMockTest {
@@ -78,7 +84,11 @@ class OrderControllerTest extends AbstractControllerMockTest {
     }
 
     @Test
-    void buy_redirectsToNewOrder() {
+    void buy_successfulPayment_createsOrderAndRedirects() {
+        List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
+        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.calculateTotal(items)).thenReturn(200L);
+        when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 800L)));
         when(orderService.buy()).thenReturn(Mono.just(5L));
 
         webTestClient.post()
@@ -86,17 +96,57 @@ class OrderControllerTest extends AbstractControllerMockTest {
                 .exchange()
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/orders/5?newOrder=true");
+
+        InOrder inOrder = inOrder(paymentService, orderService);
+        inOrder.verify(paymentService).pay(200L);
+        inOrder.verify(orderService).buy();
     }
 
     @Test
-    void buy_emptyCart_redirectsToCart() {
-        when(orderService.buy()).thenReturn(Mono.error(new EmptyCartException("Корзина пуста")));
+    void buy_insufficientFunds_doesNotCreateOrder() {
+        List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
+        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.calculateTotal(items)).thenReturn(200L);
+        when(paymentService.pay(200L)).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
 
         webTestClient.post()
                 .uri("/buy")
                 .exchange()
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/cart/items");
+
+        verify(orderService, never()).buy();
+    }
+
+    @Test
+    void buy_paymentServiceUnavailable_doesNotCreateOrder() {
+        List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
+        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.calculateTotal(items)).thenReturn(200L);
+        when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
+
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
+
+        verify(orderService, never()).buy();
+    }
+
+    @Test
+    void buy_emptyCart_redirectsToCartWithoutPayment() {
+        when(cartService.findItems()).thenReturn(Flux.empty());
+
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
+
+        verify(paymentService, never()).pay(anyLong());
+        verify(orderService, never()).buy();
     }
 
     private OrderDto order(long id) {

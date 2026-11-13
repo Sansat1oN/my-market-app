@@ -2,17 +2,23 @@ package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
+import ru.yandex.practicum.mymarket.dto.PaymentResult;
+import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.OrderService;
+import ru.yandex.practicum.mymarket.service.PaymentService;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 class OrderControllerIntegrationTest extends AbstractTest {
 
@@ -22,9 +28,13 @@ class OrderControllerIntegrationTest extends AbstractTest {
     @Autowired
     private OrderService orderService;
 
+    @MockitoBean
+    private PaymentService paymentService;
+
     @Test
     void buy_createsOrderAndClearsCart() {
         fillCart();
+        allowPayment();
 
         webTestClient.post()
                 .uri("/buy")
@@ -41,6 +51,7 @@ class OrderControllerIntegrationTest extends AbstractTest {
     @Test
     void buy_redirectsToNewOrder() {
         fillCart();
+        allowPayment();
 
         String url = webTestClient.post()
                 .uri("/buy")
@@ -62,6 +73,37 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .expectHeader().location("/cart/items");
 
         assertEquals(List.of(), orderService.findOrders().collectList().block());
+    }
+
+    @Test
+    void buy_insufficientFunds_keepsCartAndDoesNotCreateOrder() {
+        fillCart();
+        when(paymentService.pay(195L)).thenReturn(Mono.just(
+                new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
+
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
+
+        assertEquals(List.of(), orderService.findOrders().collectList().block());
+        assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());
+    }
+
+    @Test
+    void buy_paymentServiceUnavailable_keepsCartAndDoesNotCreateOrder() {
+        fillCart();
+        when(paymentService.pay(195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
+
+        webTestClient.post()
+                .uri("/buy")
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader().location("/cart/items");
+
+        assertEquals(List.of(), orderService.findOrders().collectList().block());
+        assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());
     }
 
     @Test
@@ -106,6 +148,10 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .uri("/orders/{id}", 100000L)
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    private void allowPayment() {
+        when(paymentService.pay(195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
     }
 
     private void fillCart() {
