@@ -21,7 +21,7 @@
 mvn clean package
 ```
 
-После сборки executable jar лежит в `target/my-market-app-0.0.1-SNAPSHOT.jar`
+После сборки executable jar лежит в `market-app/target/market-app-0.0.1-SNAPSHOT.jar`
 
 
 ## Тесты
@@ -37,12 +37,12 @@ mvn test
 ## Запуск и использование
 
 ```
-java -jar target/my-market-app-0.0.1-SNAPSHOT.jar
+java -jar market-app/target/market-app-0.0.1-SNAPSHOT.jar
 ```
 
 - Приложение - встроенный Netty на порту 8080, открывается по адресу `http://localhost:8080`
 - База данных H2 в памяти, после остановки приложения корзина и заказы не сохраняются
-- Таблицы создаются при старте из `src/main/resources/schema.sql`, товары загружаются из `src/main/resources/data.sql`, картинки лежат в `src/main/resources/images`
+- Таблицы создаются при старте из `market-app/src/main/resources/schema.sql`, товары загружаются из `market-app/src/main/resources/data.sql`, картинки лежат в `market-app/src/main/resources/images`
 
 
 ## Запуск в Docker
@@ -50,7 +50,7 @@ java -jar target/my-market-app-0.0.1-SNAPSHOT.jar
 Jar собирается внутри образа, заранее собирать его не нужно:
 
 ```
-docker build -t my-market-app .
+docker build -f market-app/Dockerfile -t my-market-app .
 docker run -p 8080:8080 my-market-app
 ```
 
