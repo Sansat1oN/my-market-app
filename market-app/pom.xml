@@ -41,6 +41,34 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.openapitools</groupId>
+				<artifactId>openapi-generator-maven-plugin</artifactId>
+				<version>7.12.0</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<generatorName>java</generatorName>
+							<inputSpec>${project.basedir}/../payment-service/src/main/resources/api-spec.yaml</inputSpec>
+							<ignoreFileOverride>${project.basedir}/.openapi-generator-java-sources.ignore</ignoreFileOverride>
+							<modelPackage>ru.yandex.practicum.mymarket.client.domain</modelPackage>
+							<invokerPackage>ru.yandex.practicum.mymarket.client</invokerPackage>
+							<apiPackage>ru.yandex.practicum.mymarket.client.api</apiPackage>
+							<configOptions>
+								<hideGenerationTimestamp>true</hideGenerationTimestamp>
+								<library>webclient</library>
+								<useJakartaEe>true</useJakartaEe>
+								<useTags>true</useTags>
+								<openApiNullable>false</openApiNullable>
+								<serializableModel>true</serializableModel>
+							</configOptions>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>
