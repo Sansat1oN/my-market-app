@@ -35,6 +35,9 @@ class CartServiceTest {
     @Mock
     private ItemRepository itemRepository;
 
+    @Mock
+    private ItemCacheService itemCacheService;
+
     @InjectMocks
     private CartService cartService;
 
@@ -47,7 +50,7 @@ class CartServiceTest {
         when(item.getImgPath()).thenReturn("images/milk.jpg");
         when(item.getPrice()).thenReturn(100L);
         when(cartItemRepository.findAll()).thenReturn(Flux.just(new CartItem(1L, 2)));
-        when(itemRepository.findById(1L)).thenReturn(Mono.just(item));
+        when(itemCacheService.findById(1L)).thenReturn(Mono.just(item));
 
         List<ItemDto> items = cartService.findItems().collectList().block();
 

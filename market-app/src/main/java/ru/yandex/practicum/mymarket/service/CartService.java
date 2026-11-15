@@ -18,15 +18,18 @@ public class CartService {
 
     private final CartItemRepository cartItemRepository;
     private final ItemRepository itemRepository;
+    private final ItemCacheService itemCacheService;
 
-    public CartService(CartItemRepository cartItemRepository, ItemRepository itemRepository) {
+    public CartService(CartItemRepository cartItemRepository, ItemRepository itemRepository,
+                       ItemCacheService itemCacheService) {
         this.cartItemRepository = cartItemRepository;
         this.itemRepository = itemRepository;
+        this.itemCacheService = itemCacheService;
     }
 
     public Flux<ItemDto> findItems() {
         return cartItemRepository.findAll()
-                .concatMap(cartItem -> itemRepository.findById(cartItem.getItemId())
+                .concatMap(cartItem -> itemCacheService.findById(cartItem.getItemId())
                         .map(item -> new ItemDto(item.getId(), item.getTitle(), item.getDescription(), item.getImgPath(),
                                 item.getPrice(), cartItem.getCount())));
     }
