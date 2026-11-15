@@ -28,10 +28,13 @@ public class ItemService {
 
     private final ItemRepository itemRepository;
     private final CartItemRepository cartItemRepository;
+    private final ItemCacheService itemCacheService;
 
-    public ItemService(ItemRepository itemRepository, CartItemRepository cartItemRepository) {
+    public ItemService(ItemRepository itemRepository, CartItemRepository cartItemRepository,
+                       ItemCacheService itemCacheService) {
         this.itemRepository = itemRepository;
         this.cartItemRepository = cartItemRepository;
+        this.itemCacheService = itemCacheService;
     }
 
     public Mono<Page<ItemDto>> findItems(String search, SortType sort, int pageNumber, int pageSize) {
@@ -58,7 +61,7 @@ public class ItemService {
     }
 
     public Mono<ItemDto> findItem(long id) {
-        Mono<Item> item = itemRepository.findById(id)
+        Mono<Item> item = itemCacheService.findById(id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Товар не найден: " + id)));
         Mono<Integer> count = cartItemRepository.findByItemId(id)
                 .map(CartItem::getCount)

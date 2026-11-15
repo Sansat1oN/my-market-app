@@ -36,6 +36,9 @@ class ItemServiceTest {
     @Mock
     private CartItemRepository cartItemRepository;
 
+    @Mock
+    private ItemCacheService itemCacheService;
+
     @InjectMocks
     private ItemService itemService;
 
@@ -102,7 +105,7 @@ class ItemServiceTest {
     @Test
     void findItem_returnsItemWithCartCount() {
         Item milk = item(1L, "Молоко", 50L);
-        when(itemRepository.findById(1L)).thenReturn(Mono.just(milk));
+        when(itemCacheService.findById(1L)).thenReturn(Mono.just(milk));
         when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(new CartItem(1L, 2)));
 
         ItemDto item = itemService.findItem(1L).block();
@@ -113,7 +116,7 @@ class ItemServiceTest {
     @Test
     void findItem_itemNotInCart_returnsZeroCount() {
         Item milk = item(1L, "Молоко", 50L);
-        when(itemRepository.findById(1L)).thenReturn(Mono.just(milk));
+        when(itemCacheService.findById(1L)).thenReturn(Mono.just(milk));
         when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.empty());
 
         ItemDto item = itemService.findItem(1L).block();
@@ -123,7 +126,7 @@ class ItemServiceTest {
 
     @Test
     void findItem_itemNotFound_throwsNotFoundException() {
-        when(itemRepository.findById(100L)).thenReturn(Mono.empty());
+        when(itemCacheService.findById(100L)).thenReturn(Mono.empty());
         when(cartItemRepository.findByItemId(100L)).thenReturn(Mono.empty());
 
         assertThrows(NotFoundException.class, () -> itemService.findItem(100L).block());
