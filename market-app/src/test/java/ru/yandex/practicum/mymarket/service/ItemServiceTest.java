@@ -6,8 +6,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
@@ -16,7 +14,6 @@ import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
-import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
 import java.util.List;
 
@@ -24,14 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
-
-    @Mock
-    private ItemRepository itemRepository;
 
     @Mock
     private CartItemRepository cartItemRepository;
@@ -46,9 +41,7 @@ class ItemServiceTest {
     void findItems_withoutSearch_returnsItemsWithCartCount() {
         Item milk = item(1L, "Молоко", 50L);
         Item kefir = item(2L, "Кефир", 95L);
-        PageRequest pageable = PageRequest.of(0, 5, Sort.unsorted());
-        when(itemRepository.findAllBy(pageable)).thenReturn(Flux.just(milk, kefir));
-        when(itemRepository.count()).thenReturn(Mono.just(2L));
+        when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
         when(cartItemRepository.findAll()).thenReturn(Flux.just(new CartItem(2L, 3)));
 
         Page<ItemDto> page = itemService.findItems(null, SortType.NO, 1, 5).block();
@@ -62,11 +55,9 @@ class ItemServiceTest {
     @Test
     void findItems_withSearchAndSortByPrice_searchesByTitleAndDescription() {
         Item milk = item(1L, "Молоко", 50L);
-        PageRequest pageable = PageRequest.of(1, 2, Sort.by("price", "id"));
-        when(itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase("мол", "мол", pageable))
-                .thenReturn(Flux.just(milk));
-        when(itemRepository.countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase("мол", "мол"))
-                .thenReturn(Mono.just(3L));
+        Item secondMilk = item(2L, "Молоко 2", 60L);
+        Item thirdMilk = item(3L, "Молоко 3", 70L);
+        when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, secondMilk, thirdMilk)));
         when(cartItemRepository.findAll()).thenReturn(Flux.empty());
 
         Page<ItemDto> page = itemService.findItems("мол", SortType.PRICE, 2, 2).block();
@@ -78,22 +69,21 @@ class ItemServiceTest {
 
     @Test
     void findItems_sortByAlpha_sortsByTitle() {
-        PageRequest pageable = PageRequest.of(0, 5, Sort.by("title", "id"));
-        when(itemRepository.findAllBy(pageable)).thenReturn(Flux.empty());
-        when(itemRepository.count()).thenReturn(Mono.just(0L));
+        Item milk = item(1L, "Молоко", 50L);
+        Item kefir = item(2L, "Кефир", 95L);
+        when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
         when(cartItemRepository.findAll()).thenReturn(Flux.empty());
 
         Page<ItemDto> page = itemService.findItems("", SortType.ALPHA, 1, 5).block();
 
-        assertTrue(page.getContent().isEmpty());
+        assertEquals(List.of(2L, 1L), page.getContent().stream().map(ItemDto::id).toList());
     }
 
     @Test
     void findItems_firstPageOfMany_hasNext() {
         Item milk = item(1L, "Молоко", 50L);
-        PageRequest pageable = PageRequest.of(0, 1, Sort.unsorted());
-        when(itemRepository.findAllBy(pageable)).thenReturn(Flux.just(milk));
-        when(itemRepository.count()).thenReturn(Mono.just(10L));
+        Item kefir = item(2L, "Кефир", 95L);
+        when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
         when(cartItemRepository.findAll()).thenReturn(Flux.empty());
 
         Page<ItemDto> page = itemService.findItems(null, SortType.NO, 1, 1).block();
@@ -148,11 +138,11 @@ class ItemServiceTest {
 
     private Item item(long id, String title, long price) {
         Item item = mock(Item.class);
-        when(item.getId()).thenReturn(id);
-        when(item.getTitle()).thenReturn(title);
-        when(item.getDescription()).thenReturn(title + " описание");
-        when(item.getImgPath()).thenReturn("images/" + id + ".jpg");
-        when(item.getPrice()).thenReturn(price);
+        lenient().when(item.getId()).thenReturn(id);
+        lenient().when(item.getTitle()).thenReturn(title);
+        lenient().when(item.getDescription()).thenReturn(title + " описание");
+        lenient().when(item.getImgPath()).thenReturn("images/" + id + ".jpg");
+        lenient().when(item.getPrice()).thenReturn(price);
         return item;
     }
 

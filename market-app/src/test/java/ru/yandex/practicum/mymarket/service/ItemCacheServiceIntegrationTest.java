@@ -9,6 +9,8 @@ import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.AbstractTest;
 import ru.yandex.practicum.mymarket.model.Item;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +39,19 @@ class ItemCacheServiceIntegrationTest extends AbstractTest {
     }
 
     @Test
+    void findAll_afterCacheMiss_loadsFromDatabaseAndUsesCache() {
+        List<Item> loaded = itemCacheService.findAll().block();
+        databaseClient.sql("delete from items where id = 1000").then().block();
+
+        List<Item> cached = itemCacheService.findAll().block();
+
+        assertTrue(loaded.stream().anyMatch(item -> item.getId() == TEST_ITEM_ID));
+        assertTrue(cached.stream().anyMatch(item -> item.getId() == TEST_ITEM_ID));
+        long ttl = redisTemplate.getExpire("items").block().toSeconds();
+        assertTrue(ttl > 0 && ttl <= 120);
+    }
+
+    @Test
     void findById_afterCacheMiss_loadsFromDatabaseAndUsesCache() {
         Item loaded = itemCacheService.findById(TEST_ITEM_ID).block();
         databaseClient.sql("delete from items where id = 1000").then().block();
@@ -54,6 +69,6 @@ class ItemCacheServiceIntegrationTest extends AbstractTest {
 
     private Mono<Void> clean() {
         return databaseClient.sql("delete from items where id = 1000").then()
-                .then(redisTemplate.delete("item:1000").then());
+                .then(redisTemplate.delete("items", "item:1000").then());
     }
 }

@@ -4,9 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.SortType;
@@ -14,10 +12,11 @@ import ru.yandex.practicum.mymarket.exception.NotFoundException;
 import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
-import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -26,37 +25,33 @@ public class ItemService {
     private static final int ROW_SIZE = 3;
     private static final ItemDto STUB = new ItemDto(-1, null, null, null, 0, 0);
 
-    private final ItemRepository itemRepository;
     private final CartItemRepository cartItemRepository;
     private final ItemCacheService itemCacheService;
 
-    public ItemService(ItemRepository itemRepository, CartItemRepository cartItemRepository,
-                       ItemCacheService itemCacheService) {
-        this.itemRepository = itemRepository;
+    public ItemService(CartItemRepository cartItemRepository, ItemCacheService itemCacheService) {
         this.cartItemRepository = cartItemRepository;
         this.itemCacheService = itemCacheService;
     }
 
     public Mono<Page<ItemDto>> findItems(String search, SortType sort, int pageNumber, int pageSize) {
-        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, toSort(sort));
-        Flux<Item> items;
-        Mono<Long> total;
-        if (search == null || search.isBlank()) {
-            items = itemRepository.findAllBy(pageable);
-            total = itemRepository.count();
-        } else {
-            items = itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search, pageable);
-            total = itemRepository.countByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search);
-        }
+        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
+        Mono<List<Item>> items = itemCacheService.findAll()
+                .map(allItems -> allItems.stream()
+                        .filter(item -> matches(item, search))
+                        .sorted(toComparator(sort))
+                        .toList());
         Mono<Map<Long, Integer>> counts = cartItemRepository.findAll()
                 .collectMap(CartItem::getItemId, CartItem::getCount);
-        return Mono.zip(items.collectList(), total, counts)
+        return Mono.zip(items, counts)
                 .map(result -> {
+                    List<Item> foundItems = result.getT1();
+                    int from = Math.min((pageNumber - 1) * pageSize, foundItems.size());
+                    int to = Math.min(from + pageSize, foundItems.size());
                     List<ItemDto> content = new ArrayList<>();
-                    for (Item item : result.getT1()) {
-                        content.add(toDto(item, result.getT3().getOrDefault(item.getId(), 0)));
+                    for (Item item : foundItems.subList(from, to)) {
+                        content.add(toDto(item, result.getT2().getOrDefault(item.getId(), 0)));
                     }
-                    return new PageImpl<>(content, pageable, result.getT2());
+                    return new PageImpl<>(content, pageable, foundItems.size());
                 });
     }
 
@@ -82,11 +77,20 @@ public class ItemService {
         return rows;
     }
 
-    private Sort toSort(SortType sort) {
+    private boolean matches(Item item, String search) {
+        if (search == null || search.isBlank()) {
+            return true;
+        }
+        String query = search.toLowerCase(Locale.ROOT);
+        return item.getTitle().toLowerCase(Locale.ROOT).contains(query)
+                || item.getDescription().toLowerCase(Locale.ROOT).contains(query);
+    }
+
+    private Comparator<Item> toComparator(SortType sort) {
         return switch (sort) {
-            case NO -> Sort.unsorted();
-            case ALPHA -> Sort.by("title", "id");
-            case PRICE -> Sort.by("price", "id");
+            case NO -> Comparator.comparing(Item::getId);
+            case ALPHA -> Comparator.comparing(Item::getTitle).thenComparing(Item::getId);
+            case PRICE -> Comparator.comparingLong(Item::getPrice).thenComparing(Item::getId);
         };
     }
 
