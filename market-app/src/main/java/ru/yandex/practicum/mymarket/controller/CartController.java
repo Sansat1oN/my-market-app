@@ -5,6 +5,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.CartForm;
 import ru.yandex.practicum.mymarket.dto.PaymentStatus;
@@ -23,7 +24,13 @@ public class CartController {
     }
 
     @GetMapping("/cart/items")
-    public Mono<String> getCart(Model model) {
+    public Mono<String> getCart(@RequestParam(name = "paymentStatus", required = false) String paymentStatus,
+                                Model model) {
+        if (PaymentStatus.INSUFFICIENT_FUNDS.name().equals(paymentStatus)) {
+            model.addAttribute("checkoutError", "Оплата не прошла: недостаточно средств. Заказ не оформлен.");
+        } else if (PaymentStatus.UNAVAILABLE.name().equals(paymentStatus)) {
+            model.addAttribute("checkoutError", "Оплата не прошла: сервис платежей недоступен. Заказ не оформлен.");
+        }
         return showCart(model);
     }
 

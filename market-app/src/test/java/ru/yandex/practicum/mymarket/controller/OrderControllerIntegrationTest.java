@@ -1,6 +1,8 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import reactor.core.publisher.Mono;
@@ -75,32 +77,41 @@ class OrderControllerIntegrationTest extends AbstractTest {
         assertEquals(List.of(), orderService.findOrders().collectList().block());
     }
 
-    @Test
-    void buy_insufficientFunds_keepsCartAndDoesNotCreateOrder() {
+    @ParameterizedTest
+    @CsvSource({
+            "INSUFFICIENT_FUNDS, SUCCESS, 100, true, Оплата не прошла: недостаточно средств. Заказ не оформлен.",
+            "INSUFFICIENT_FUNDS, SUCCESS, 1000, false, Оплата не прошла: недостаточно средств. Заказ не оформлен.",
+            "UNAVAILABLE, UNAVAILABLE, 0, true, Оплата не прошла: сервис платежей недоступен. Заказ не оформлен.",
+            "UNAVAILABLE, SUCCESS, 1000, false, Оплата не прошла: сервис платежей недоступен. Заказ не оформлен."
+    })
+    void buy_failedPayment_showsErrorAfterRedirectAndKeepsCart(PaymentStatus paymentStatus,
+                                                               PaymentStatus balanceStatus, long balance,
+                                                               boolean disabled, String message) {
         fillCart();
         when(paymentService.pay(195L)).thenReturn(Mono.just(
-                new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
+                new PaymentResult(paymentStatus, null)));
+        when(paymentService.getBalance()).thenReturn(Mono.just(new PaymentResult(balanceStatus, balance)));
 
-        webTestClient.post()
+        String url = webTestClient.post()
                 .uri("/buy")
                 .exchange()
                 .expectStatus().is3xxRedirection()
-                .expectHeader().location("/cart/items");
+                .expectHeader().location("/cart/items?paymentStatus=" + paymentStatus)
+                .returnResult(Void.class)
+                .getResponseHeaders().getLocation().toString();
 
-        assertEquals(List.of(), orderService.findOrders().collectList().block());
-        assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());
-    }
-
-    @Test
-    void buy_paymentServiceUnavailable_keepsCartAndDoesNotCreateOrder() {
-        fillCart();
-        when(paymentService.pay(195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
-
-        webTestClient.post()
-                .uri("/buy")
+        webTestClient.get()
+                .uri(url)
                 .exchange()
-                .expectStatus().is3xxRedirection()
-                .expectHeader().location("/cart/items");
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertTrue(html.contains(message));
+                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    assertTrue(html.contains("Кефир ПРОСТОКВАШИНО"));
+                    assertTrue(html.contains("Итого: 195 руб."));
+                    assertEquals(disabled, html.contains("disabled=\"disabled\""));
+                });
 
         assertEquals(List.of(), orderService.findOrders().collectList().block());
         assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());

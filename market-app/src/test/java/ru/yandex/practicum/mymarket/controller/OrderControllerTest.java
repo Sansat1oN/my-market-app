@@ -114,7 +114,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
                 .uri("/buy")
                 .exchange()
                 .expectStatus().is3xxRedirection()
-                .expectHeader().location("/cart/items");
+                .expectHeader().location("/cart/items?paymentStatus=INSUFFICIENT_FUNDS");
 
         verify(orderService, never()).buy();
     }
@@ -130,7 +130,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
                 .uri("/buy")
                 .exchange()
                 .expectStatus().is3xxRedirection()
-                .expectHeader().location("/cart/items");
+                .expectHeader().location("/cart/items?paymentStatus=UNAVAILABLE");
 
         verify(orderService, never()).buy();
     }

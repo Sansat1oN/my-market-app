@@ -62,7 +62,7 @@ public class OrderController {
                                     return orderService.buy()
                                             .map(id -> "redirect:/orders/" + id + "?newOrder=true");
                                 }
-                                return Mono.just("redirect:/cart/items");
+                                return Mono.just("redirect:/cart/items?paymentStatus=" + payment.status());
                             });
                 })
                 .onErrorResume(EmptyCartException.class, e -> Mono.just("redirect:/cart/items"));
