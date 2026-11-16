@@ -9,6 +9,7 @@ import ru.yandex.practicum.mymarket.controller.ImageController;
 import ru.yandex.practicum.mymarket.controller.ItemController;
 import ru.yandex.practicum.mymarket.controller.OrderController;
 import ru.yandex.practicum.mymarket.service.CartService;
+import ru.yandex.practicum.mymarket.service.CheckoutService;
 import ru.yandex.practicum.mymarket.service.ImageService;
 import ru.yandex.practicum.mymarket.service.ItemService;
 import ru.yandex.practicum.mymarket.service.OrderService;
@@ -28,6 +29,9 @@ public abstract class AbstractControllerMockTest {
 
     @MockitoBean
     protected OrderService orderService;
+
+    @MockitoBean
+    protected CheckoutService checkoutService;
 
     @MockitoBean
     protected PaymentService paymentService;

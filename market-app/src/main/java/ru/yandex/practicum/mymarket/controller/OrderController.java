@@ -9,21 +9,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
-import ru.yandex.practicum.mymarket.service.CartService;
+import ru.yandex.practicum.mymarket.service.CheckoutService;
 import ru.yandex.practicum.mymarket.service.OrderService;
-import ru.yandex.practicum.mymarket.service.PaymentService;
 
 @Controller
 public class OrderController {
 
     private final OrderService orderService;
-    private final CartService cartService;
-    private final PaymentService paymentService;
+    private final CheckoutService checkoutService;
 
-    public OrderController(OrderService orderService, CartService cartService, PaymentService paymentService) {
+    public OrderController(OrderService orderService, CheckoutService checkoutService) {
         this.orderService = orderService;
-        this.cartService = cartService;
-        this.paymentService = paymentService;
+        this.checkoutService = checkoutService;
     }
 
     @GetMapping("/orders")
@@ -50,20 +47,12 @@ public class OrderController {
 
     @PostMapping("/buy")
     public Mono<String> buy() {
-        return cartService.findItems()
-                .collectList()
-                .flatMap(items -> {
-                    if (items.isEmpty()) {
-                        return Mono.just("redirect:/cart/items");
+        return checkoutService.buy()
+                .map(result -> {
+                    if (result.status() == PaymentStatus.SUCCESS) {
+                        return "redirect:/orders/" + result.orderId() + "?newOrder=true";
                     }
-                    return paymentService.pay(cartService.calculateTotal(items))
-                            .flatMap(payment -> {
-                                if (payment.status() == PaymentStatus.SUCCESS) {
-                                    return orderService.buy()
-                                            .map(id -> "redirect:/orders/" + id + "?newOrder=true");
-                                }
-                                return Mono.just("redirect:/cart/items?paymentStatus=" + payment.status());
-                            });
+                    return "redirect:/cart/items?paymentStatus=" + result.status();
                 })
                 .onErrorResume(EmptyCartException.class, e -> Mono.just("redirect:/cart/items"));
     }
