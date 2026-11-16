@@ -148,7 +148,12 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .value(html -> {
                     assertTrue(html.contains("Поздравляем"));
                     assertTrue(html.contains("Заказ №" + id));
-                    assertTrue(html.contains("Молоко ЛЕНТА пастеризованное"));
+                    for (ItemDto item : List.of(milk(), kefir())) {
+                        assertTrue(html.contains("src=\"/" + item.imgPath() + "\""));
+                        assertTrue(html.contains(item.title()));
+                        assertTrue(html.contains(item.price() + " руб."));
+                        assertTrue(html.contains(item.count() + " шт."));
+                    }
                     assertTrue(html.contains("Сумма: 195 руб."));
                 });
     }
