@@ -39,15 +39,15 @@ class CheckoutServiceTest {
 
     @Test
     void buy_successfulPayment_createsOrderAfterPayment() {
-        fillCart();
+        List<ItemDto> items = fillCart();
         when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 800L)));
-        when(orderService.buy()).thenReturn(Mono.just(5L));
+        when(orderService.buy(items)).thenReturn(Mono.just(5L));
 
         assertEquals(new CheckoutResult(PaymentStatus.SUCCESS, 5L), checkoutService.buy().block());
 
         InOrder inOrder = inOrder(paymentService, orderService);
         inOrder.verify(paymentService).pay(200L);
-        inOrder.verify(orderService).buy();
+        inOrder.verify(orderService).buy(items);
     }
 
     @Test
@@ -80,9 +80,10 @@ class CheckoutServiceTest {
         verifyNoInteractions(paymentService, orderService);
     }
 
-    private void fillCart() {
+    private List<ItemDto> fillCart() {
         List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
         when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(200L);
+        return items;
     }
 }

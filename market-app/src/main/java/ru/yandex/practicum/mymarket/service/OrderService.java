@@ -8,7 +8,6 @@ import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
-import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Order;
 import ru.yandex.practicum.mymarket.model.OrderItem;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
@@ -48,25 +47,28 @@ public class OrderService {
     }
 
     @Transactional
-    public Mono<Long> buy() {
-        return cartItemRepository.findAll()
-                .collectList()
-                .flatMap(cartItems -> {
-                    if (cartItems.isEmpty()) {
-                        return Mono.error(new EmptyCartException("Корзина пуста"));
-                    }
-                    return orderRepository.save(new Order())
-                            .flatMap(order -> saveOrderItems(order, cartItems)
-                                    .then(cartItemRepository.deleteAll())
-                                    .thenReturn(order.getId()));
-                });
+    public Mono<Long> buy(List<ItemDto> items) {
+        List<ItemDto> snapshot = List.copyOf(items);
+        if (snapshot.isEmpty()) {
+            return Mono.error(new EmptyCartException("Корзина пуста"));
+        }
+        return orderRepository.save(new Order())
+                .flatMap(order -> saveOrderItems(order, snapshot)
+                        .then(removePurchasedItems(snapshot))
+                        .thenReturn(order.getId()));
     }
 
-    private Flux<OrderItem> saveOrderItems(Order order, List<CartItem> cartItems) {
-        return Flux.fromIterable(cartItems)
-                .concatMap(cartItem -> itemRepository.findById(cartItem.getItemId())
-                        .flatMap(item -> orderItemRepository.save(
-                                new OrderItem(order.getId(), item.getId(), item.getPrice(), cartItem.getCount()))));
+    private Flux<OrderItem> saveOrderItems(Order order, List<ItemDto> items) {
+        return Flux.fromIterable(items)
+                .concatMap(item -> orderItemRepository.save(
+                        new OrderItem(order.getId(), item.id(), item.price(), item.count())));
+    }
+
+    private Mono<Void> removePurchasedItems(List<ItemDto> items) {
+        return Flux.fromIterable(items)
+                .concatMap(item -> cartItemRepository.subtractPurchasedCount(item.id(), item.count())
+                        .then(cartItemRepository.deleteEmptyItem(item.id())))
+                .then();
     }
 
     private Mono<OrderDto> toDto(Order order) {

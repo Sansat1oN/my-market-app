@@ -12,7 +12,6 @@ import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.NotFoundException;
-import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.Item;
 import ru.yandex.practicum.mymarket.model.Order;
 import ru.yandex.practicum.mymarket.model.OrderItem;
@@ -29,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,19 +75,16 @@ class OrderServiceTest {
     }
 
     @Test
-    void buy_createsOrderFromCartAndClearsCart() {
-        Item item = mock(Item.class);
-        when(item.getId()).thenReturn(1L);
-        when(item.getPrice()).thenReturn(100L);
+    void buy_createsOrderFromSnapshotAndRemovesPurchasedCount() {
+        List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
         Order saved = mock(Order.class);
         when(saved.getId()).thenReturn(5L);
-        when(cartItemRepository.findAll()).thenReturn(Flux.just(new CartItem(1L, 2)));
         when(orderRepository.save(any(Order.class))).thenReturn(Mono.just(saved));
-        when(itemRepository.findById(1L)).thenReturn(Mono.just(item));
         when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        when(cartItemRepository.deleteAll()).thenReturn(Mono.empty());
+        when(cartItemRepository.subtractPurchasedCount(1L, 2)).thenReturn(Mono.just(1));
+        when(cartItemRepository.deleteEmptyItem(1L)).thenReturn(Mono.just(1));
 
-        Long id = orderService.buy().block();
+        Long id = orderService.buy(items).block();
 
         assertEquals(5L, id);
         ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
@@ -96,14 +93,15 @@ class OrderServiceTest {
         assertEquals(1L, captor.getValue().getItemId());
         assertEquals(100L, captor.getValue().getPrice());
         assertEquals(2, captor.getValue().getCount());
-        verify(cartItemRepository).deleteAll();
+        verify(cartItemRepository).subtractPurchasedCount(1L, 2);
+        verify(cartItemRepository).deleteEmptyItem(1L);
+        verify(cartItemRepository, never()).findAll();
+        verifyNoInteractions(itemRepository);
     }
 
     @Test
     void buy_emptyCart_throwsEmptyCartException() {
-        when(cartItemRepository.findAll()).thenReturn(Flux.empty());
-
-        assertThrows(EmptyCartException.class, () -> orderService.buy().block());
+        assertThrows(EmptyCartException.class, () -> orderService.buy(List.of()).block());
 
         verify(orderRepository, never()).save(any(Order.class));
     }

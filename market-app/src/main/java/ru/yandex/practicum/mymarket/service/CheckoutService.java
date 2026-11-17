@@ -6,6 +6,8 @@ import ru.yandex.practicum.mymarket.dto.CheckoutResult;
 import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 
+import java.util.List;
+
 @Service
 public class CheckoutService {
 
@@ -22,6 +24,7 @@ public class CheckoutService {
     public Mono<CheckoutResult> buy() {
         return cartService.findItems()
                 .collectList()
+                .map(List::copyOf)
                 .flatMap(items -> {
                     if (items.isEmpty()) {
                         return Mono.error(new EmptyCartException("Корзина пуста"));
@@ -29,7 +32,7 @@ public class CheckoutService {
                     return paymentService.pay(cartService.calculateTotal(items))
                             .flatMap(payment -> {
                                 if (payment.status() == PaymentStatus.SUCCESS) {
-                                    return orderService.buy()
+                                    return orderService.buy(items)
                                             .map(id -> new CheckoutResult(PaymentStatus.SUCCESS, id));
                                 }
                                 return Mono.just(new CheckoutResult(payment.status(), null));
