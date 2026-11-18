@@ -1,7 +1,8 @@
 # Описание
-- Веб-приложение «Витрина интернет-магазина» на Spring Boot
+- Проект из веб-приложения «Витрина интернет-магазина» и RESTful-сервиса платежей
 - Витрина товаров, карточка товара, корзина, оформление заказа, список заказов
-- Учебный проект 6-го спринта: проект 5-го спринта, переписанный на реактивный стек
+- Кеширование товаров в Redis, получение баланса и оплата через сервис платежей
+- Учебный проект 7-го спринта
 
 ## Стек
 
@@ -9,7 +10,10 @@
 - Spring Boot 3.5.5
 - Spring WebFlux, Thymeleaf
 - Spring Data R2DBC
+- Spring Data Redis
 - H2
+- Redis
+- OpenAPI Generator
 - Maven
 - Встроенный Netty
 - JUnit 5
@@ -21,7 +25,10 @@
 mvn clean package
 ```
 
-После сборки executable jar лежит в `target/my-market-app-0.0.1-SNAPSHOT.jar`
+После сборки executable jar лежат в:
+
+- `market-app/target/market-app-0.0.1-SNAPSHOT.jar`
+- `payment-service/target/payment-service-0.0.1-SNAPSHOT.jar`
 
 
 ## Тесты
@@ -30,31 +37,46 @@ mvn clean package
 mvn test
 ```
 
-- Тесты каждого вида наследуют общий базовый класс, поэтому контекст Spring поднимается три раза на весь прогон
+- Тесты каждого вида наследуют общий базовый класс для кеширования контекстов Spring
 - Таблицы и товары создаются скриптами `schema.sql` и `data.sql` при старте контекста, у тестов репозиториев своя база в памяти
+- В интеграционных тестах витрины используется Embedded Redis на порту 6370, внешний Redis не нужен
 
 
 ## Запуск и использование
 
+Запустить Redis и затем оба приложения в отдельных терминалах:
+
 ```
-java -jar target/my-market-app-0.0.1-SNAPSHOT.jar
+docker run -d --name my-market-redis -p 6379:6379 redis:7.4.2-bookworm
+java -jar payment-service/target/payment-service-0.0.1-SNAPSHOT.jar
+java -jar market-app/target/market-app-0.0.1-SNAPSHOT.jar
 ```
 
-- Приложение - встроенный Netty на порту 8080, открывается по адресу `http://localhost:8080`
+- Витрина открывается по адресу `http://localhost:8080`, сервис платежей работает на порту 8081
+- Начальный баланс в сервисе платежей: 1000 рублей
 - База данных H2 в памяти, после остановки приложения корзина и заказы не сохраняются
-- Таблицы создаются при старте из `src/main/resources/schema.sql`, товары загружаются из `src/main/resources/data.sql`, картинки лежат в `src/main/resources/images`
+- Таблицы создаются при старте из `market-app/src/main/resources/schema.sql`, товары загружаются из `market-app/src/main/resources/data.sql`, картинки лежат в `market-app/src/main/resources/images`
+- Товары кешируются в Redis на 2 минуты
 
 
-## Запуск в Docker
+## Запуск в Docker Compose
 
-Jar собирается внутри образа, заранее собирать его не нужно:
+Jar собираются внутри образов, заранее собирать их не нужно:
 
 ```
-docker build -t my-market-app .
-docker run -p 8080:8080 my-market-app
+docker compose up --build
 ```
 
-Приложение открывается по адресу `http://localhost:8080`
+Остановить все контейнеры:
+
+```
+docker compose down
+```
+
+## Сервис платежей
+
+- `GET /balance` - получить текущий баланс
+- `POST /payments` с JSON `{"amount": 100}` - списать сумму заказа и получить остаток
 
 
 ## Страницы

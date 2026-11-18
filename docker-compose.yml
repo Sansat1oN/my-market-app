@@ -1,0 +1,32 @@
+services:
+  redis:
+    image: redis:7.4.2-bookworm
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    ports:
+      - "8081:8081"
+
+  market-app:
+    build:
+      context: .
+      dockerfile: market-app/Dockerfile
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      PAYMENT_SERVICE_URL: http://payment-service:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      payment-service:
+        condition: service_started
