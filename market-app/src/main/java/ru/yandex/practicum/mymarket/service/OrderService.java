@@ -34,14 +34,14 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Flux<OrderDto> findOrders() {
-        return orderRepository.findAll()
+    public Flux<OrderDto> findOrders(String username) {
+        return orderRepository.findAllByUsername(username)
                 .concatMap(this::toDto);
     }
 
     @Transactional(readOnly = true)
-    public Mono<OrderDto> findOrder(long id) {
-        return orderRepository.findById(id)
+    public Mono<OrderDto> findOrder(String username, long id) {
+        return orderRepository.findByUsernameAndId(username, id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Заказ не найден: " + id)))
                 .flatMap(this::toDto);
     }
@@ -52,7 +52,7 @@ public class OrderService {
         if (snapshot.isEmpty()) {
             return Mono.error(new EmptyCartException("Корзина пуста"));
         }
-        return orderRepository.save(new Order())
+        return orderRepository.save(new Order(username))
                 .flatMap(order -> saveOrderItems(order, snapshot)
                         .then(removePurchasedItems(username, snapshot))
                         .thenReturn(order.getId()));

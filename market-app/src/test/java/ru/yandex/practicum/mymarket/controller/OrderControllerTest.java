@@ -22,7 +22,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getOrders_returnsOrders() {
-        when(orderService.findOrders()).thenReturn(Flux.just(order(1L), order(2L)));
+        when(orderService.findOrders("buyer1")).thenReturn(Flux.just(order(1L), order(2L)));
 
         webTestClient.get()
                 .uri("/orders")
@@ -40,7 +40,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getOrder_withoutNewOrder_returnsOrderWithoutCongratulation() {
-        when(orderService.findOrder(1L)).thenReturn(Mono.just(order(1L)));
+        when(orderService.findOrder("buyer1", 1L)).thenReturn(Mono.just(order(1L)));
 
         webTestClient.get()
                 .uri("/orders/{id}", 1L)
@@ -56,7 +56,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getOrder_newOrder_returnsOrderWithCongratulation() {
-        when(orderService.findOrder(1L)).thenReturn(Mono.just(order(1L)));
+        when(orderService.findOrder("buyer1", 1L)).thenReturn(Mono.just(order(1L)));
 
         webTestClient.get()
                 .uri("/orders/{id}?newOrder=true", 1L)
@@ -71,7 +71,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getOrder_orderNotFound_404() {
-        when(orderService.findOrder(100L)).thenReturn(Mono.error(new NotFoundException("Заказ не найден: 100")));
+        when(orderService.findOrder("buyer1", 100L)).thenReturn(Mono.error(new NotFoundException("Заказ не найден: 100")));
 
         webTestClient.get()
                 .uri("/orders/{id}", 100L)

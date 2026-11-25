@@ -52,9 +52,9 @@ class OrderServiceTest {
     @Test
     void findOrders_returnsOrdersWithTotalSum() {
         Order order = order(7L);
-        when(orderRepository.findAll()).thenReturn(Flux.just(order));
+        when(orderRepository.findAllByUsername("buyer1")).thenReturn(Flux.just(order));
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
 
         assertEquals(List.of(orderDto(7L)), orders);
     }
@@ -62,16 +62,16 @@ class OrderServiceTest {
     @Test
     void findOrder_returnsOrderWithTotalSum() {
         Order order = order(7L);
-        when(orderRepository.findById(7L)).thenReturn(Mono.just(order));
+        when(orderRepository.findByUsernameAndId("buyer1", 7L)).thenReturn(Mono.just(order));
 
-        assertEquals(orderDto(7L), orderService.findOrder(7L).block());
+        assertEquals(orderDto(7L), orderService.findOrder("buyer1", 7L).block());
     }
 
     @Test
     void findOrder_unknownOrder_throwsNotFoundException() {
-        when(orderRepository.findById(100L)).thenReturn(Mono.empty());
+        when(orderRepository.findByUsernameAndId("buyer1", 100L)).thenReturn(Mono.empty());
 
-        assertThrows(NotFoundException.class, () -> orderService.findOrder(100L).block());
+        assertThrows(NotFoundException.class, () -> orderService.findOrder("buyer1", 100L).block());
     }
 
     @Test

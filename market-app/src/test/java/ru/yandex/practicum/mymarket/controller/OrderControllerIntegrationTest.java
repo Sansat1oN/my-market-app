@@ -20,6 +20,7 @@ import ru.yandex.practicum.mymarket.service.PaymentService;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +66,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .exchange()
                 .expectStatus().is3xxRedirection();
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
         assertEquals(1, orders.size());
         assertEquals(List.of(milk(), kefir()), orders.get(0).items());
         assertEquals(195L, orders.get(0).totalSum());
@@ -89,7 +90,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                     .exchange()
                     .expectStatus().is3xxRedirection();
 
-            List<OrderDto> orders = orderService.findOrders().collectList().block();
+            List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
             assertEquals(1, orders.size());
             assertEquals(paidItems, orders.get(0).items());
             assertEquals(50L, orders.get(0).totalSum());
@@ -117,7 +118,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .exchange()
                 .expectStatus().is3xxRedirection();
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
         assertEquals(1, orders.size());
         assertEquals(paidItems, orders.get(0).items());
         assertEquals(50L, orders.get(0).totalSum());
@@ -137,7 +138,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .returnResult(Void.class)
                 .getResponseHeaders().getLocation().toString();
 
-        long id = orderService.findOrders().blockFirst().id();
+        long id = orderService.findOrders("buyer1").blockFirst().id();
         assertEquals("/orders/" + id + "?newOrder=true", url);
     }
 
@@ -149,7 +150,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/cart/items");
 
-        assertEquals(List.of(), orderService.findOrders().collectList().block());
+        assertEquals(List.of(), orderService.findOrders("buyer1").collectList().block());
     }
 
     @ParameterizedTest
@@ -188,7 +189,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                     assertEquals(disabled, html.contains("disabled=\"disabled\""));
                 });
 
-        assertEquals(List.of(), orderService.findOrders().collectList().block());
+        assertEquals(List.of(), orderService.findOrders("buyer1").collectList().block());
         assertEquals(List.of(milk(), kefir()), cartService.findItems("buyer1").collectList().block());
     }
 
@@ -231,6 +232,26 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                     }
                     assertTrue(html.contains("Сумма: 195 руб."));
                 });
+    }
+
+    @Test
+    void buyersSeeOnlyTheirOwnOrders() {
+        WebTestClient secondBuyer = signInAs("buyer2");
+        long firstOrder = orderService.buy("buyer1", List.of(milk())).block();
+        long secondOrder = orderService.buy("buyer2", List.of(kefir())).block();
+
+        assertOwnOrderAccess(webTestClient, firstOrder, secondOrder);
+        assertOwnOrderAccess(secondBuyer, secondOrder, firstOrder);
+    }
+
+    private void assertOwnOrderAccess(WebTestClient buyer, long ownId, long otherId) {
+        buyer.get().uri("/orders").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> {
+                    assertTrue(html.contains("href=\"/orders/" + ownId + "\""));
+                    assertFalse(html.contains("href=\"/orders/" + otherId + "\""));
+                });
+        buyer.get().uri("/orders/{id}", ownId).exchange().expectStatus().isOk();
+        buyer.get().uri("/orders/{id}", otherId).exchange().expectStatus().isNotFound();
     }
 
     @Test
