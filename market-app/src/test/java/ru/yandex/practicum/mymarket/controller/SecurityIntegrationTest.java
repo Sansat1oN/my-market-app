@@ -5,12 +5,34 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.reactive.function.BodyInserters;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class SecurityIntegrationTest extends AbstractBuyerControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/", "/items", "/items/1", "/images/milk.jpg"})
     void guestCanViewCatalog(String path) {
         guest.get().uri(path).exchange().expectStatus().isOk();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/items", "/items/1"})
+    void guestSeesLoginAndNoCartControls(String path) {
+        guest.get().uri(path).exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertThat(html)
+                        .contains("href=\"/login\"", "Молоко")
+                        .doesNotContain("href=\"/orders\"", "href=\"/cart/items\"",
+                                "action=\"/logout\"", "name=\"action\""));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/items", "/items/1"})
+    void buyerSeesNavigationAndCartControls(String path) {
+        webTestClient.get().uri(path).exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertThat(html)
+                        .contains("href=\"/orders\"", "href=\"/cart/items\"", "action=\"/logout\"",
+                                "value=\"PLUS\"", "value=\"MINUS\"")
+                        .doesNotContain("href=\"/login\""));
     }
 
     @ParameterizedTest

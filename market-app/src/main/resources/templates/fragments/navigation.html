@@ -1,0 +1,11 @@
+<nav xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+     th:fragment="navigation" class="hstack gap-3 ms-auto">
+    <a th:if="${#authentication == null}" href="/login" class="btn btn-primary">Войти</a>
+    <th:block sec:authorize="isAuthenticated()">
+        <a href="/orders" class="btn btn-secondary bi bi-file-earmark-text"> Заказы</a>
+        <a href="/cart/items" class="btn btn-secondary bi bi-cart4"> Корзина</a>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="btn btn-outline-secondary">Выйти</button>
+        </form>
+    </th:block>
+</nav>
