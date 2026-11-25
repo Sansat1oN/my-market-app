@@ -5,6 +5,8 @@ info:
   version: 1.0.0
 servers:
   - url: http://localhost:8081
+security:
+  - paymentBearer: []
 paths:
   /balance:
     get:
@@ -15,6 +17,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Username'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Текущий баланс
           content:
@@ -36,6 +42,10 @@ paths:
             schema:
               $ref: '#/components/schemas/PaymentRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Оплата прошла, возвращается остаток на счёте
           content:
@@ -49,6 +59,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    paymentBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Требуется действительный токен сервиса платежей
+    Forbidden:
+      description: Доступ разрешён только клиенту витрины
   parameters:
     Username:
       name: username

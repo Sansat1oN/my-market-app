@@ -11,7 +11,18 @@
       "secret": "${MARKET_CLIENT_SECRET}",
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "payment-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "payment-service",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ]
 }
