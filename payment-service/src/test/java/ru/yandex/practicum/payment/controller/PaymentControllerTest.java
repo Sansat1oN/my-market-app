@@ -1,6 +1,8 @@
 package ru.yandex.practicum.payment.controller;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.payment.AbstractControllerMockTest;
@@ -11,6 +13,23 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PaymentControllerTest extends AbstractControllerMockTest {
+
+    @Test
+    void emptyUsernameReturnsBadRequest() {
+        webTestClient.get().uri("/balance?username=").exchange().expectStatus().isBadRequest();
+        webTestClient.post().uri("/payments?username=").bodyValue(new PaymentRequest(1L))
+                .exchange().expectStatus().isBadRequest();
+        verifyNoInteractions(paymentService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "\"100\"", "-1", "9223372036854775808"})
+    void invalidAmountReturnsBadRequest(String amount) {
+        webTestClient.post().uri("/payments?username=buyer1")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{\"amount\":" + amount + "}")
+                .exchange().expectStatus().isBadRequest();
+        verifyNoInteractions(paymentService);
+    }
 
     @Test
     void getBalance_returnsBalance() {

@@ -72,6 +72,12 @@ class PaymentControllerIntegrationTest extends AbstractTest {
         assertPaymentAccessDenied(clientWithToken("invalid"), HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void expiredTokenIsUnauthorized() throws JOSEException {
+        String expired = signedToken("market-app", "payment-service", ISSUER, Instant.now().minusSeconds(300));
+        assertPaymentAccessDenied(clientWithToken(expired), HttpStatus.UNAUTHORIZED);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "another-client, payment-service, http://localhost:8082/realms/market, 403",
@@ -99,8 +105,12 @@ class PaymentControllerIntegrationTest extends AbstractTest {
     }
 
     private String signedToken(String client, String audience, String issuer) throws JOSEException {
+        return signedToken(client, audience, issuer, Instant.now().plusSeconds(300));
+    }
+
+    private String signedToken(String client, String audience, String issuer, Instant expiresAt) throws JOSEException {
         var claims = new JWTClaimsSet.Builder().subject("service-account-" + client).claim("azp", client)
-                .issuer(issuer).audience(audience).expirationTime(Date.from(Instant.now().plusSeconds(300))).build();
+                .issuer(issuer).audience(audience).expirationTime(Date.from(expiresAt)).build();
         var header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signingKey.getKeyID()).build();
         var jwt = new SignedJWT(header, claims);
         jwt.sign(new RSASSASigner(signingKey));
