@@ -1,3 +1,9 @@
+CREATE TABLE IF NOT EXISTS customers
+(
+    username      VARCHAR(255) PRIMARY KEY,
+    password_hash VARCHAR(60)  NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS items
 (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -9,14 +15,17 @@ CREATE TABLE IF NOT EXISTS items
 
 CREATE TABLE IF NOT EXISTS cart_items
 (
-    id      BIGINT AUTO_INCREMENT PRIMARY KEY,
-    item_id BIGINT NOT NULL UNIQUE REFERENCES items (id),
-    count   INT    NOT NULL
+    id       BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL REFERENCES customers (username),
+    item_id  BIGINT NOT NULL REFERENCES items (id),
+    count    INT NOT NULL,
+    UNIQUE (username, item_id)
 );
 
 CREATE TABLE IF NOT EXISTS orders
 (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY
+    id       BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL REFERENCES customers (username)
 );
 
 CREATE TABLE IF NOT EXISTS order_items

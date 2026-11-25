@@ -16,41 +16,41 @@ class CartItemRepositoryTest extends AbstractRepositoryTest {
     private CartItemRepository cartItemRepository;
 
     @Test
-    void findByItemId_returnsCartItem() {
-        cartItemRepository.save(new CartItem(1L, 2)).block();
+    void findByUsernameAndItemId_returnsCartItem() {
+        cartItemRepository.save(new CartItem("buyer1", 1L, 2)).block();
 
-        CartItem cartItem = cartItemRepository.findByItemId(1L).block();
+        CartItem cartItem = cartItemRepository.findByUsernameAndItemId("buyer1", 1L).block();
 
         assertEquals(1L, cartItem.getItemId());
         assertEquals(2, cartItem.getCount());
     }
 
     @Test
-    void findByItemId_itemNotInCart_returnsEmpty() {
-        assertNull(cartItemRepository.findByItemId(1L).block());
+    void findByUsernameAndItemId_itemNotInCart_returnsEmpty() {
+        assertNull(cartItemRepository.findByUsernameAndItemId("buyer1", 1L).block());
     }
 
     @ParameterizedTest
     @CsvSource({"3, 2, 1", "2, 2, 0", "1, 2, 0"})
     void removePurchasedItems_preservesOnlyRemainingCount(int currentCount, int purchasedCount, int remainingCount) {
-        cartItemRepository.save(new CartItem(1L, currentCount)).block();
-        cartItemRepository.save(new CartItem(2L, 1)).block();
+        cartItemRepository.save(new CartItem("buyer1", 1L, currentCount)).block();
+        cartItemRepository.save(new CartItem("buyer1", 2L, 1)).block();
 
-        cartItemRepository.subtractPurchasedCount(1L, purchasedCount)
-                .then(cartItemRepository.deleteEmptyItem(1L)).block();
+        cartItemRepository.subtractPurchasedCount("buyer1", 1L, purchasedCount)
+                .then(cartItemRepository.deleteEmptyItem("buyer1", 1L)).block();
 
-        CartItem remaining = cartItemRepository.findByItemId(1L).block();
+        CartItem remaining = cartItemRepository.findByUsernameAndItemId("buyer1", 1L).block();
         if (remainingCount == 0) {
             assertNull(remaining);
         } else {
             assertEquals(remainingCount, remaining.getCount());
         }
-        assertEquals(1, cartItemRepository.findByItemId(2L).block().getCount());
+        assertEquals(1, cartItemRepository.findByUsernameAndItemId("buyer1", 2L).block().getCount());
     }
 
     @Test
     void removePurchasedItems_alreadyDeletedItem_doesNothing() {
-        assertEquals(0, cartItemRepository.subtractPurchasedCount(1L, 2).block());
-        assertEquals(0, cartItemRepository.deleteEmptyItem(1L).block());
+        assertEquals(0, cartItemRepository.subtractPurchasedCount("buyer1", 1L, 2).block());
+        assertEquals(0, cartItemRepository.deleteEmptyItem("buyer1", 1L).block());
     }
 }

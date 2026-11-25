@@ -33,20 +33,20 @@ public class ItemService {
         this.itemCacheService = itemCacheService;
     }
 
-    public Mono<Page<ItemDto>> findItems(String search, SortType sort, int pageNumber, int pageSize) {
+    public Mono<Page<ItemDto>> findItems(String username, String search, SortType sort, int pageNumber, int pageSize) {
         Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
         Mono<List<Item>> items = itemCacheService.findAll()
                 .map(allItems -> allItems.stream()
                         .filter(item -> matches(item, search))
                         .sorted(toComparator(sort))
                         .toList());
-        Mono<Map<Long, Integer>> counts = cartItemRepository.findAll()
-                .collectMap(CartItem::getItemId, CartItem::getCount);
+        Mono<Map<Long, Integer>> counts = username == null ? Mono.just(Map.of())
+                : cartItemRepository.findAllByUsername(username).collectMap(CartItem::getItemId, CartItem::getCount);
         return Mono.zip(items, counts)
                 .map(result -> {
                     List<Item> foundItems = result.getT1();
-                    int from = Math.min((pageNumber - 1) * pageSize, foundItems.size());
-                    int to = Math.min(from + pageSize, foundItems.size());
+                    int from = (int) Math.min(pageable.getOffset(), foundItems.size());
+                    int to = (int) Math.min((long) from + pageSize, foundItems.size());
                     List<ItemDto> content = new ArrayList<>();
                     for (Item item : foundItems.subList(from, to)) {
                         content.add(toDto(item, result.getT2().getOrDefault(item.getId(), 0)));
@@ -55,12 +55,11 @@ public class ItemService {
                 });
     }
 
-    public Mono<ItemDto> findItem(long id) {
+    public Mono<ItemDto> findItem(String username, long id) {
         Mono<Item> item = itemCacheService.findById(id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Товар не найден: " + id)));
-        Mono<Integer> count = cartItemRepository.findByItemId(id)
-                .map(CartItem::getCount)
-                .defaultIfEmpty(0);
+        Mono<Integer> count = username == null ? Mono.just(0)
+                : cartItemRepository.findByUsernameAndItemId(username, id).map(CartItem::getCount).defaultIfEmpty(0);
         return Mono.zip(item, count)
                 .map(result -> toDto(result.getT1(), result.getT2()));
     }
@@ -83,7 +82,7 @@ public class ItemService {
         }
         String query = search.toLowerCase(Locale.ROOT);
         return item.getTitle().toLowerCase(Locale.ROOT).contains(query)
-                || item.getDescription().toLowerCase(Locale.ROOT).contains(query);
+                || (item.getDescription() != null && item.getDescription().toLowerCase(Locale.ROOT).contains(query));
     }
 
     private Comparator<Item> toComparator(SortType sort) {

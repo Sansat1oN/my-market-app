@@ -9,6 +9,8 @@ public class CartItem {
     @Id
     private Long id;
 
+    private String username;
+
     private Long itemId;
 
     private int count;
@@ -16,13 +18,18 @@ public class CartItem {
     protected CartItem() {
     }
 
-    public CartItem(Long itemId, int count) {
+    public CartItem(String username, Long itemId, int count) {
+        this.username = username;
         this.itemId = itemId;
         this.count = count;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public String getUsername() {
+        return username;
     }
 
     public Long getItemId() {

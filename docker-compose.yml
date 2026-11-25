@@ -1,4 +1,15 @@
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HOSTNAME: http://localhost:8082
+      MARKET_CLIENT_SECRET: ${MARKET_CLIENT_SECRET:-market-app-dev-secret}
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - ./keycloak/market-realm.json:/opt/keycloak/data/import/market-realm.json:ro
+
   redis:
     image: redis:7.4.2-bookworm
     ports:
@@ -13,6 +24,8 @@ services:
     build:
       context: .
       dockerfile: payment-service/Dockerfile
+    environment:
+      KEYCLOAK_REALM_URL: http://keycloak:8080/realms/market
     ports:
       - "8081:8081"
 
@@ -23,6 +36,8 @@ services:
     environment:
       SPRING_DATA_REDIS_HOST: redis
       PAYMENT_SERVICE_URL: http://payment-service:8081
+      KEYCLOAK_REALM_URL: http://keycloak:8080/realms/market
+      MARKET_CLIENT_SECRET: ${MARKET_CLIENT_SECRET:-market-app-dev-secret}
     ports:
       - "8080:8080"
     depends_on:

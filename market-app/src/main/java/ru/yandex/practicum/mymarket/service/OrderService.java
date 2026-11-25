@@ -34,27 +34,28 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Flux<OrderDto> findOrders() {
-        return orderRepository.findAll()
+    public Flux<OrderDto> findOrders(String username) {
+        return orderRepository.findAllByUsername(username)
                 .concatMap(this::toDto);
     }
 
     @Transactional(readOnly = true)
-    public Mono<OrderDto> findOrder(long id) {
-        return orderRepository.findById(id)
+    public Mono<OrderDto> findOrder(String username, long id) {
+        return orderRepository.findByUsernameAndId(username, id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Заказ не найден: " + id)))
                 .flatMap(this::toDto);
     }
 
     @Transactional
-    public Mono<Long> buy(List<ItemDto> items) {
+    public Mono<Long> buy(String username, List<ItemDto> items) {
         List<ItemDto> snapshot = List.copyOf(items);
         if (snapshot.isEmpty()) {
             return Mono.error(new EmptyCartException("Корзина пуста"));
         }
-        return orderRepository.save(new Order())
+        return cartItemRepository.lockCartOwner(username)
+                .then(orderRepository.save(new Order(username)))
                 .flatMap(order -> saveOrderItems(order, snapshot)
-                        .then(removePurchasedItems(snapshot))
+                        .then(removePurchasedItems(username, snapshot))
                         .thenReturn(order.getId()));
     }
 
@@ -64,10 +65,10 @@ public class OrderService {
                         new OrderItem(order.getId(), item.id(), item.price(), item.count())));
     }
 
-    private Mono<Void> removePurchasedItems(List<ItemDto> items) {
+    private Mono<Void> removePurchasedItems(String username, List<ItemDto> items) {
         return Flux.fromIterable(items)
-                .concatMap(item -> cartItemRepository.subtractPurchasedCount(item.id(), item.count())
-                        .then(cartItemRepository.deleteEmptyItem(item.id())))
+                .concatMap(item -> cartItemRepository.subtractPurchasedCount(username, item.id(), item.count())
+                        .then(cartItemRepository.deleteEmptyItem(username, item.id())))
                 .then();
     }
 

@@ -1,5 +1,6 @@
 package ru.yandex.practicum.payment.controller;
 
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,16 +24,22 @@ public class PaymentController implements PaymentsApi {
     }
 
     @Override
-    public Mono<ResponseEntity<Balance>> getBalance(ServerWebExchange exchange) {
-        return paymentService.getBalance()
+    public Mono<ResponseEntity<Balance>> getBalance(String username, ServerWebExchange exchange) {
+        return paymentService.getBalance(username)
                 .map(balance -> ResponseEntity.ok(new Balance(balance)));
     }
 
     @Override
-    public Mono<ResponseEntity<Balance>> createPayment(Mono<PaymentRequest> paymentRequest, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<Balance>> createPayment(String username, Mono<PaymentRequest> paymentRequest,
+                                                       ServerWebExchange exchange) {
         return paymentRequest
-                .flatMap(request -> paymentService.pay(request.getAmount()))
+                .flatMap(request -> paymentService.pay(username, request.getAmount()))
                 .map(balance -> ResponseEntity.ok(new Balance(balance)));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Void> handleInvalidParameter() {
+        return ResponseEntity.badRequest().build();
     }
 
     @ExceptionHandler(InsufficientFundsException.class)

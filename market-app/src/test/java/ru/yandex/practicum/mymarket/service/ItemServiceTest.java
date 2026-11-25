@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,9 +43,9 @@ class ItemServiceTest {
         Item milk = item(1L, "Молоко", 50L);
         Item kefir = item(2L, "Кефир", 95L);
         when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
-        when(cartItemRepository.findAll()).thenReturn(Flux.just(new CartItem(2L, 3)));
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.just(new CartItem("buyer1", 2L, 3)));
 
-        Page<ItemDto> page = itemService.findItems(null, SortType.NO, 1, 5).block();
+        Page<ItemDto> page = itemService.findItems("buyer1", null, SortType.NO, 1, 5).block();
 
         assertEquals(2, page.getContent().size());
         assertEquals(new ItemDto(1L, "Молоко", "Молоко описание", "images/1.jpg", 50L, 0), page.getContent().get(0));
@@ -58,9 +59,9 @@ class ItemServiceTest {
         Item secondMilk = item(2L, "Молоко 2", 60L);
         Item thirdMilk = item(3L, "Молоко 3", 70L);
         when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, secondMilk, thirdMilk)));
-        when(cartItemRepository.findAll()).thenReturn(Flux.empty());
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.empty());
 
-        Page<ItemDto> page = itemService.findItems("мол", SortType.PRICE, 2, 2).block();
+        Page<ItemDto> page = itemService.findItems("buyer1", "мол", SortType.PRICE, 2, 2).block();
 
         assertEquals(1, page.getContent().size());
         assertTrue(page.hasPrevious());
@@ -72,9 +73,9 @@ class ItemServiceTest {
         Item milk = item(1L, "Молоко", 50L);
         Item kefir = item(2L, "Кефир", 95L);
         when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
-        when(cartItemRepository.findAll()).thenReturn(Flux.empty());
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.empty());
 
-        Page<ItemDto> page = itemService.findItems("", SortType.ALPHA, 1, 5).block();
+        Page<ItemDto> page = itemService.findItems("buyer1", "", SortType.ALPHA, 1, 5).block();
 
         assertEquals(List.of(2L, 1L), page.getContent().stream().map(ItemDto::id).toList());
     }
@@ -84,9 +85,9 @@ class ItemServiceTest {
         Item milk = item(1L, "Молоко", 50L);
         Item kefir = item(2L, "Кефир", 95L);
         when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk, kefir)));
-        when(cartItemRepository.findAll()).thenReturn(Flux.empty());
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.empty());
 
-        Page<ItemDto> page = itemService.findItems(null, SortType.NO, 1, 1).block();
+        Page<ItemDto> page = itemService.findItems("buyer1", null, SortType.NO, 1, 1).block();
 
         assertFalse(page.hasPrevious());
         assertTrue(page.hasNext());
@@ -96,9 +97,9 @@ class ItemServiceTest {
     void findItem_returnsItemWithCartCount() {
         Item milk = item(1L, "Молоко", 50L);
         when(itemCacheService.findById(1L)).thenReturn(Mono.just(milk));
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(new CartItem(1L, 2)));
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.just(new CartItem("buyer1", 1L, 2)));
 
-        ItemDto item = itemService.findItem(1L).block();
+        ItemDto item = itemService.findItem("buyer1", 1L).block();
 
         assertEquals(new ItemDto(1L, "Молоко", "Молоко описание", "images/1.jpg", 50L, 2), item);
     }
@@ -107,9 +108,9 @@ class ItemServiceTest {
     void findItem_itemNotInCart_returnsZeroCount() {
         Item milk = item(1L, "Молоко", 50L);
         when(itemCacheService.findById(1L)).thenReturn(Mono.just(milk));
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.empty());
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.empty());
 
-        ItemDto item = itemService.findItem(1L).block();
+        ItemDto item = itemService.findItem("buyer1", 1L).block();
 
         assertEquals(0, item.count());
     }
@@ -117,9 +118,20 @@ class ItemServiceTest {
     @Test
     void findItem_itemNotFound_throwsNotFoundException() {
         when(itemCacheService.findById(100L)).thenReturn(Mono.empty());
-        when(cartItemRepository.findByItemId(100L)).thenReturn(Mono.empty());
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 100L)).thenReturn(Mono.empty());
 
-        assertThrows(NotFoundException.class, () -> itemService.findItem(100L).block());
+        assertThrows(NotFoundException.class, () -> itemService.findItem("buyer1", 100L).block());
+    }
+
+    @Test
+    void guestReadsCatalogAndItemWithoutLookingUpCart() {
+        Item milk = item(1L, "Молоко", 50L);
+        when(itemCacheService.findAll()).thenReturn(Mono.just(List.of(milk)));
+        when(itemCacheService.findById(1L)).thenReturn(Mono.just(milk));
+
+        assertEquals(0, itemService.findItems(null, null, SortType.NO, 1, 5).block().getContent().get(0).count());
+        assertEquals(0, itemService.findItem(null, 1L).block().count());
+        verifyNoInteractions(cartItemRepository);
     }
 
     @Test

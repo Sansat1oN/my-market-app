@@ -23,9 +23,9 @@ class CartControllerTest extends AbstractControllerMockTest {
     @Test
     void getCart_returnsItemsAndTotal() {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
-        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.get()
@@ -45,9 +45,9 @@ class CartControllerTest extends AbstractControllerMockTest {
     @Test
     void getCart_insufficientBalance_disablesBuyButton() {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
-        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.SUCCESS, 299L)));
 
         webTestClient.get()
@@ -64,9 +64,9 @@ class CartControllerTest extends AbstractControllerMockTest {
     @Test
     void getCart_paymentServiceUnavailable_disablesBuyButtonAndShowsError() {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
-        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
 
         webTestClient.get()
@@ -82,7 +82,7 @@ class CartControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getCart_emptyCart_returnsPageWithoutItemsAndTotal() {
-        when(cartService.findItems()).thenReturn(Flux.empty());
+        when(cartService.findItems("buyer1")).thenReturn(Flux.empty());
         when(cartService.calculateTotal(List.of())).thenReturn(0L);
 
         webTestClient.get()
@@ -97,42 +97,28 @@ class CartControllerTest extends AbstractControllerMockTest {
     }
 
     @Test
-    void changeCountOnCart_returnsCartWithNewCount() {
-        List<ItemDto> items = List.of(item(1L, 3));
-        when(cartService.changeCount(1L, CartAction.PLUS)).thenReturn(Mono.empty());
-        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
-        when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
-                new PaymentResult(PaymentStatus.SUCCESS, 300L)));
+    void changeCountOnCart_redirectsToCart() {
+        when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/cart/items")
-                .body(BodyInserters.fromFormData("id", "1")
-                        .with("action", "PLUS"))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .value(html -> {
-                    assertTrue(html.contains("<span>3</span>"));
-                    assertTrue(html.contains("Итого: 300 руб."));
-                });
+                .body(BodyInserters.fromFormData("id", "1").with("action", "PLUS"))
+                .exchange().expectStatus().isSeeOther().expectHeader().location("/cart/items");
 
-        verify(cartService).changeCount(1L, CartAction.PLUS);
+        verify(cartService).changeCount("buyer1", 1L, CartAction.PLUS);
     }
 
     @Test
     void changeCountOnCart_delete_callsServiceWithDelete() {
-        when(cartService.changeCount(1L, CartAction.DELETE)).thenReturn(Mono.empty());
-        when(cartService.findItems()).thenReturn(Flux.empty());
-
+        when(cartService.changeCount("buyer1", 1L, CartAction.DELETE)).thenReturn(Mono.empty());
         webTestClient.post()
                 .uri("/cart/items")
                 .body(BodyInserters.fromFormData("id", "1")
                         .with("action", "DELETE"))
                 .exchange()
-                .expectStatus().isOk();
+                .expectStatus().isSeeOther().expectHeader().location("/cart/items");
 
-        verify(cartService).changeCount(1L, CartAction.DELETE);
+        verify(cartService).changeCount("buyer1", 1L, CartAction.DELETE);
     }
 
     private ItemDto item(long id, int count) {

@@ -29,7 +29,7 @@ class CartServiceIntegrationTest extends AbstractTest {
                         + "values (1000, 'Тестовый товар', 'Описание', 'images/test.jpg', 123)")
                 .then()
                 .block();
-        databaseClient.sql("insert into cart_items (item_id, count) values (1000, 2)")
+        databaseClient.sql("insert into cart_items (username, item_id, count) values ('buyer1', 1000, 2)")
                 .then()
                 .block();
     }
@@ -44,7 +44,7 @@ class CartServiceIntegrationTest extends AbstractTest {
         itemCacheService.findById(1000L).block();
         databaseClient.sql("update items set title = 'Изменённый товар' where id = 1000").then().block();
 
-        ItemDto item = cartService.findItems().single().block();
+        ItemDto item = cartService.findItems("buyer1").single().block();
 
         assertEquals("Тестовый товар", item.title());
         assertEquals(2, item.count());

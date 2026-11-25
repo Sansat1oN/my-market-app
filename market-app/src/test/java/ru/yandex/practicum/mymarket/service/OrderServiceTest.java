@@ -52,9 +52,9 @@ class OrderServiceTest {
     @Test
     void findOrders_returnsOrdersWithTotalSum() {
         Order order = order(7L);
-        when(orderRepository.findAll()).thenReturn(Flux.just(order));
+        when(orderRepository.findAllByUsername("buyer1")).thenReturn(Flux.just(order));
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
 
         assertEquals(List.of(orderDto(7L)), orders);
     }
@@ -62,29 +62,30 @@ class OrderServiceTest {
     @Test
     void findOrder_returnsOrderWithTotalSum() {
         Order order = order(7L);
-        when(orderRepository.findById(7L)).thenReturn(Mono.just(order));
+        when(orderRepository.findByUsernameAndId("buyer1", 7L)).thenReturn(Mono.just(order));
 
-        assertEquals(orderDto(7L), orderService.findOrder(7L).block());
+        assertEquals(orderDto(7L), orderService.findOrder("buyer1", 7L).block());
     }
 
     @Test
     void findOrder_unknownOrder_throwsNotFoundException() {
-        when(orderRepository.findById(100L)).thenReturn(Mono.empty());
+        when(orderRepository.findByUsernameAndId("buyer1", 100L)).thenReturn(Mono.empty());
 
-        assertThrows(NotFoundException.class, () -> orderService.findOrder(100L).block());
+        assertThrows(NotFoundException.class, () -> orderService.findOrder("buyer1", 100L).block());
     }
 
     @Test
     void buy_createsOrderFromSnapshotAndRemovesPurchasedCount() {
         List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
         Order saved = mock(Order.class);
+        when(cartItemRepository.lockCartOwner("buyer1")).thenReturn(Mono.just("buyer1"));
         when(saved.getId()).thenReturn(5L);
         when(orderRepository.save(any(Order.class))).thenReturn(Mono.just(saved));
         when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        when(cartItemRepository.subtractPurchasedCount(1L, 2)).thenReturn(Mono.just(1));
-        when(cartItemRepository.deleteEmptyItem(1L)).thenReturn(Mono.just(1));
+        when(cartItemRepository.subtractPurchasedCount("buyer1", 1L, 2)).thenReturn(Mono.just(1));
+        when(cartItemRepository.deleteEmptyItem("buyer1", 1L)).thenReturn(Mono.just(1));
 
-        Long id = orderService.buy(items).block();
+        Long id = orderService.buy("buyer1", items).block();
 
         assertEquals(5L, id);
         ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
@@ -93,15 +94,15 @@ class OrderServiceTest {
         assertEquals(1L, captor.getValue().getItemId());
         assertEquals(100L, captor.getValue().getPrice());
         assertEquals(2, captor.getValue().getCount());
-        verify(cartItemRepository).subtractPurchasedCount(1L, 2);
-        verify(cartItemRepository).deleteEmptyItem(1L);
+        verify(cartItemRepository).subtractPurchasedCount("buyer1", 1L, 2);
+        verify(cartItemRepository).deleteEmptyItem("buyer1", 1L);
         verify(cartItemRepository, never()).findAll();
         verifyNoInteractions(itemRepository);
     }
 
     @Test
     void buy_emptyCart_throwsEmptyCartException() {
-        assertThrows(EmptyCartException.class, () -> orderService.buy(List.of()).block());
+        assertThrows(EmptyCartException.class, () -> orderService.buy("buyer1", List.of()).block());
 
         verify(orderRepository, never()).save(any(Order.class));
     }

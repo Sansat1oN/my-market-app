@@ -9,7 +9,6 @@ import ru.yandex.practicum.mymarket.model.OrderItem;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class OrderRepositoryTest extends AbstractRepositoryTest {
 
@@ -21,13 +20,13 @@ class OrderRepositoryTest extends AbstractRepositoryTest {
 
     @Test
     void save_savesOrderWithItems() {
-        Long id = orderRepository.save(new Order()).block().getId();
+        Long id = orderRepository.save(new Order("buyer1")).block().getId();
         orderItemRepository.save(new OrderItem(id, 1L, 50L, 2)).block();
         orderItemRepository.save(new OrderItem(id, 2L, 95L, 1)).block();
 
         List<OrderItem> items = orderItemRepository.findByOrderId(id).collectList().block();
 
-        assertNotNull(orderRepository.findById(id).block());
+        assertEquals("buyer1", orderRepository.findByUsernameAndId("buyer1", id).block().getUsername());
         assertEquals(2, items.size());
         long totalSum = 0;
         for (OrderItem orderItem : items) {

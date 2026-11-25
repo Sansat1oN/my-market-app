@@ -7,10 +7,13 @@ import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 public class CheckoutService {
 
+    private final ConcurrentMap<String, Mono<CheckoutResult>> activePurchases = new ConcurrentHashMap<>();
     private final CartService cartService;
     private final PaymentService paymentService;
     private final OrderService orderService;
@@ -21,18 +24,25 @@ public class CheckoutService {
         this.orderService = orderService;
     }
 
-    public Mono<CheckoutResult> buy() {
-        return cartService.findItems()
+    public Mono<CheckoutResult> buy(String username) {
+        return Mono.defer(() -> activePurchases.computeIfAbsent(username, buyer ->
+                Mono.defer(() -> checkout(buyer))
+                        .doOnTerminate(() -> activePurchases.remove(buyer))
+                        .cache()));
+    }
+
+    private Mono<CheckoutResult> checkout(String username) {
+        return cartService.findItems(username)
                 .collectList()
                 .map(List::copyOf)
                 .flatMap(items -> {
                     if (items.isEmpty()) {
                         return Mono.error(new EmptyCartException("Корзина пуста"));
                     }
-                    return paymentService.pay(cartService.calculateTotal(items))
+                    return paymentService.pay(username, cartService.calculateTotal(items))
                             .flatMap(payment -> {
                                 if (payment.status() == PaymentStatus.SUCCESS) {
-                                    return orderService.buy(items)
+                                    return orderService.buy(username, items)
                                             .map(id -> new CheckoutResult(PaymentStatus.SUCCESS, id));
                                 }
                                 return Mono.just(new CheckoutResult(payment.status(), null));

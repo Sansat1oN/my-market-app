@@ -6,16 +6,12 @@ import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWeb
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.r2dbc.core.DatabaseClient;
-import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.data.redis.port=6370")
+        properties = {"spring.data.redis.port=6370", "spring.r2dbc.url=r2dbc:h2:mem:///${random.uuid}"})
 @AutoConfigureWebTestClient
 @Import(EmbeddedRedisConfiguration.class)
 public abstract class AbstractTest {
-
-    @Autowired
-    protected WebTestClient webTestClient;
 
     @Autowired
     protected DatabaseClient databaseClient;

@@ -5,8 +5,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
-import ru.yandex.practicum.mymarket.AbstractTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
@@ -19,11 +20,12 @@ import ru.yandex.practicum.mymarket.service.PaymentService;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class OrderControllerIntegrationTest extends AbstractTest {
+class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Autowired
     private CartService cartService;
@@ -35,6 +37,26 @@ class OrderControllerIntegrationTest extends AbstractTest {
     private PaymentService paymentService;
 
     @Test
+    void buy_clearsOnlyCurrentBuyersCart() {
+        WebTestClient secondBuyer = signInAs("buyer2");
+        fillCart();
+        allowPayment();
+        secondBuyer.post().uri("/items/1")
+                .body(BodyInserters.fromFormData("action", "PLUS"))
+                .exchange().expectStatus().isSeeOther().expectHeader().location("/items/1");
+
+        webTestClient.post().uri("/buy").exchange().expectStatus().is3xxRedirection();
+
+        verify(paymentService).pay("buyer1", 195L);
+        assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
+        secondBuyer.get().uri("/items/1").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertTrue(html.contains("<span>1</span>")));
+        when(paymentService.getBalance("buyer2")).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 1000L)));
+        secondBuyer.get().uri("/cart/items").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertTrue(html.contains("Итого: 50 руб.")));
+    }
+
+    @Test
     void buy_createsOrderAndClearsCart() {
         fillCart();
         allowPayment();
@@ -44,20 +66,20 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .exchange()
                 .expectStatus().is3xxRedirection();
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
         assertEquals(1, orders.size());
         assertEquals(List.of(milk(), kefir()), orders.get(0).items());
         assertEquals(195L, orders.get(0).totalSum());
-        assertEquals(List.of(), cartService.findItems().collectList().block());
+        assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
     }
 
     @ParameterizedTest
     @CsvSource({"PLUS, 50", "MINUS, 50", "DELETE, 50", "PLUS, 150"})
     void buy_cartOrPriceChangesDuringPayment_createsOrderFromPaidSnapshot(CartAction action, long newPrice) {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        List<ItemDto> paidItems = cartService.findItems().collectList().block();
-        when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
-                cartService.changeCount(1L, action)
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
+        when(paymentService.pay("buyer1", 50L)).thenReturn(Mono.defer(() ->
+                cartService.changeCount("buyer1", 1L, action)
                         .then(databaseClient.sql("update items set price = :price where id = 1")
                                 .bind("price", newPrice).then())
                         .thenReturn(new PaymentResult(PaymentStatus.SUCCESS, 950L))));
@@ -68,12 +90,12 @@ class OrderControllerIntegrationTest extends AbstractTest {
                     .exchange()
                     .expectStatus().is3xxRedirection();
 
-            List<OrderDto> orders = orderService.findOrders().collectList().block();
+            List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
             assertEquals(1, orders.size());
             assertEquals(paidItems, orders.get(0).items());
             assertEquals(50L, orders.get(0).totalSum());
-            verify(paymentService).pay(50L);
-            List<ItemDto> remainingItems = cartService.findItems().collectList().block();
+            verify(paymentService).pay("buyer1", 50L);
+            List<ItemDto> remainingItems = cartService.findItems("buyer1").collectList().block();
             assertEquals(action == CartAction.PLUS ? 1 : 0, remainingItems.size());
             if (action == CartAction.PLUS) {
                 assertEquals(1, remainingItems.get(0).count());
@@ -85,10 +107,10 @@ class OrderControllerIntegrationTest extends AbstractTest {
 
     @Test
     void buy_anotherItemAddedDuringPayment_keepsItInCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        List<ItemDto> paidItems = cartService.findItems().collectList().block();
-        when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
-                cartService.changeCount(2L, CartAction.PLUS)
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
+        when(paymentService.pay("buyer1", 50L)).thenReturn(Mono.defer(() ->
+                cartService.changeCount("buyer1", 2L, CartAction.PLUS)
                         .thenReturn(new PaymentResult(PaymentStatus.SUCCESS, 950L))));
 
         webTestClient.post()
@@ -96,12 +118,12 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .exchange()
                 .expectStatus().is3xxRedirection();
 
-        List<OrderDto> orders = orderService.findOrders().collectList().block();
+        List<OrderDto> orders = orderService.findOrders("buyer1").collectList().block();
         assertEquals(1, orders.size());
         assertEquals(paidItems, orders.get(0).items());
         assertEquals(50L, orders.get(0).totalSum());
-        assertEquals(List.of(kefir()), cartService.findItems().collectList().block());
-        verify(paymentService).pay(50L);
+        assertEquals(List.of(kefir()), cartService.findItems("buyer1").collectList().block());
+        verify(paymentService).pay("buyer1", 50L);
     }
 
     @Test
@@ -116,7 +138,7 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .returnResult(Void.class)
                 .getResponseHeaders().getLocation().toString();
 
-        long id = orderService.findOrders().blockFirst().id();
+        long id = orderService.findOrders("buyer1").blockFirst().id();
         assertEquals("/orders/" + id + "?newOrder=true", url);
     }
 
@@ -128,7 +150,7 @@ class OrderControllerIntegrationTest extends AbstractTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/cart/items");
 
-        assertEquals(List.of(), orderService.findOrders().collectList().block());
+        assertEquals(List.of(), orderService.findOrders("buyer1").collectList().block());
     }
 
     @ParameterizedTest
@@ -142,9 +164,9 @@ class OrderControllerIntegrationTest extends AbstractTest {
                                                                PaymentStatus balanceStatus, long balance,
                                                                boolean disabled, String message) {
         fillCart();
-        when(paymentService.pay(195L)).thenReturn(Mono.just(
+        when(paymentService.pay("buyer1", 195L)).thenReturn(Mono.just(
                 new PaymentResult(paymentStatus, null)));
-        when(paymentService.getBalance()).thenReturn(Mono.just(new PaymentResult(balanceStatus, balance)));
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(new PaymentResult(balanceStatus, balance)));
 
         String url = webTestClient.post()
                 .uri("/buy")
@@ -167,14 +189,14 @@ class OrderControllerIntegrationTest extends AbstractTest {
                     assertEquals(disabled, html.contains("disabled=\"disabled\""));
                 });
 
-        assertEquals(List.of(), orderService.findOrders().collectList().block());
-        assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());
+        assertEquals(List.of(), orderService.findOrders("buyer1").collectList().block());
+        assertEquals(List.of(milk(), kefir()), cartService.findItems("buyer1").collectList().block());
     }
 
     @Test
     void getOrders_returnsOrders() {
         fillCart();
-        long id = orderService.buy(cartService.findItems().collectList().block()).block();
+        long id = orderService.buy("buyer1", cartService.findItems("buyer1").collectList().block()).block();
 
         webTestClient.get()
                 .uri("/orders")
@@ -192,7 +214,7 @@ class OrderControllerIntegrationTest extends AbstractTest {
     @Test
     void getOrder_newOrder_returnsOrderWithCongratulation() {
         fillCart();
-        long id = orderService.buy(cartService.findItems().collectList().block()).block();
+        long id = orderService.buy("buyer1", cartService.findItems("buyer1").collectList().block()).block();
 
         webTestClient.get()
                 .uri("/orders/{id}?newOrder=true", id)
@@ -213,6 +235,26 @@ class OrderControllerIntegrationTest extends AbstractTest {
     }
 
     @Test
+    void buyersSeeOnlyTheirOwnOrders() {
+        WebTestClient secondBuyer = signInAs("buyer2");
+        long firstOrder = orderService.buy("buyer1", List.of(milk())).block();
+        long secondOrder = orderService.buy("buyer2", List.of(kefir())).block();
+
+        assertOwnOrderAccess(webTestClient, firstOrder, secondOrder);
+        assertOwnOrderAccess(secondBuyer, secondOrder, firstOrder);
+    }
+
+    private void assertOwnOrderAccess(WebTestClient buyer, long ownId, long otherId) {
+        buyer.get().uri("/orders").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> {
+                    assertTrue(html.contains("href=\"/orders/" + ownId + "\""));
+                    assertFalse(html.contains("href=\"/orders/" + otherId + "\""));
+                });
+        buyer.get().uri("/orders/{id}", ownId).exchange().expectStatus().isOk();
+        buyer.get().uri("/orders/{id}", otherId).exchange().expectStatus().isNotFound();
+    }
+
+    @Test
     void getOrder_orderNotFound_404() {
         webTestClient.get()
                 .uri("/orders/{id}", 100000L)
@@ -221,13 +263,13 @@ class OrderControllerIntegrationTest extends AbstractTest {
     }
 
     private void allowPayment() {
-        when(paymentService.pay(195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
+        when(paymentService.pay("buyer1", 195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
     }
 
     private void fillCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(2L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 2L, CartAction.PLUS).block();
     }
 
     private ItemDto milk() {

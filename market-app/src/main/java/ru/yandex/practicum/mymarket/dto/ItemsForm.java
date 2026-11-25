@@ -1,6 +1,9 @@
 package ru.yandex.practicum.mymarket.dto;
 
-public record ItemsForm(long id, String search, SortType sort, Integer pageNumber, Integer pageSize, CartAction action) {
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
+public record ItemsForm(long id, String search, SortType sort, @Positive Integer pageNumber, @Positive Integer pageSize, @NotNull CartAction action) {
 
     public ItemsForm {
         if (sort == null) {

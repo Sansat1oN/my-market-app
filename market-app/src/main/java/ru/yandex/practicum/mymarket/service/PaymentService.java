@@ -19,14 +19,14 @@ public class PaymentService {
         this.paymentsApi = paymentsApi;
     }
 
-    public Mono<PaymentResult> getBalance() {
-        return paymentsApi.getBalance()
+    public Mono<PaymentResult> getBalance(String username) {
+        return paymentsApi.getBalance(username)
                 .map(this::success)
                 .onErrorResume(error -> Mono.just(unavailable()));
     }
 
-    public Mono<PaymentResult> pay(long amount) {
-        return paymentsApi.createPayment(new PaymentRequest().amount(amount))
+    public Mono<PaymentResult> pay(String username, long amount) {
+        return paymentsApi.createPayment(username, new PaymentRequest().amount(amount))
                 .map(this::success)
                 .onErrorResume(WebClientResponseException.class, error -> {
                     if (error.getStatusCode() == HttpStatus.CONFLICT) {
