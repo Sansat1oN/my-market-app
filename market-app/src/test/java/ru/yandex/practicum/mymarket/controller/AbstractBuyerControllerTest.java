@@ -23,9 +23,13 @@ abstract class AbstractBuyerControllerTest extends AbstractTest {
 
     @BeforeEach
     void signIn() {
+        webTestClient = signInAs("buyer1");
+    }
+
+    protected WebTestClient signInAs(String username) {
         WebTestClient loginForm = openLoginForm();
         var login = loginForm.post().uri("/login")
-                .body(BodyInserters.fromFormData("username", "buyer1").with("password", "buyer1"))
+                .body(BodyInserters.fromFormData("username", username).with("password", username))
                 .exchange()
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/")
@@ -34,7 +38,7 @@ abstract class AbstractBuyerControllerTest extends AbstractTest {
         WebTestClient buyer = guest.mutate().defaultCookie("SESSION", session).build();
         String form = buyer.get().uri("/items/1").exchange()
                 .expectStatus().isOk().expectBody(String.class).returnResult().getResponseBody();
-        webTestClient = buyer.mutate().defaultHeader("X-CSRF-TOKEN", csrfToken(form)).build();
+        return buyer.mutate().defaultHeader("X-CSRF-TOKEN", csrfToken(form)).build();
     }
 
     protected WebTestClient openLoginForm() {

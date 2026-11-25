@@ -41,13 +41,13 @@ class CheckoutServiceTest {
     void buy_successfulPayment_createsOrderAfterPayment() {
         List<ItemDto> items = fillCart();
         when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 800L)));
-        when(orderService.buy(items)).thenReturn(Mono.just(5L));
+        when(orderService.buy("buyer1", items)).thenReturn(Mono.just(5L));
 
-        assertEquals(new CheckoutResult(PaymentStatus.SUCCESS, 5L), checkoutService.buy().block());
+        assertEquals(new CheckoutResult(PaymentStatus.SUCCESS, 5L), checkoutService.buy("buyer1").block());
 
         InOrder inOrder = inOrder(paymentService, orderService);
         inOrder.verify(paymentService).pay(200L);
-        inOrder.verify(orderService).buy(items);
+        inOrder.verify(orderService).buy("buyer1", items);
     }
 
     @Test
@@ -56,7 +56,7 @@ class CheckoutServiceTest {
         when(paymentService.pay(200L)).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
 
-        assertEquals(new CheckoutResult(PaymentStatus.INSUFFICIENT_FUNDS, null), checkoutService.buy().block());
+        assertEquals(new CheckoutResult(PaymentStatus.INSUFFICIENT_FUNDS, null), checkoutService.buy("buyer1").block());
 
         verifyNoInteractions(orderService);
     }
@@ -66,23 +66,23 @@ class CheckoutServiceTest {
         fillCart();
         when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
 
-        assertEquals(new CheckoutResult(PaymentStatus.UNAVAILABLE, null), checkoutService.buy().block());
+        assertEquals(new CheckoutResult(PaymentStatus.UNAVAILABLE, null), checkoutService.buy("buyer1").block());
 
         verifyNoInteractions(orderService);
     }
 
     @Test
     void buy_emptyCart_doesNotPayOrCreateOrder() {
-        when(cartService.findItems()).thenReturn(Flux.empty());
+        when(cartService.findItems("buyer1")).thenReturn(Flux.empty());
 
-        assertThrows(EmptyCartException.class, () -> checkoutService.buy().block());
+        assertThrows(EmptyCartException.class, () -> checkoutService.buy("buyer1").block());
 
         verifyNoInteractions(paymentService, orderService);
     }
 
     private List<ItemDto> fillCart() {
         List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
-        when(cartService.findItems()).thenReturn(Flux.fromIterable(items));
+        when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(200L);
         return items;
     }

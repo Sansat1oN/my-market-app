@@ -27,8 +27,8 @@ public class CartService {
         this.itemCacheService = itemCacheService;
     }
 
-    public Flux<ItemDto> findItems() {
-        return cartItemRepository.findAll()
+    public Flux<ItemDto> findItems(String username) {
+        return cartItemRepository.findAllByUsername(username)
                 .concatMap(cartItem -> itemCacheService.findById(cartItem.getItemId())
                         .map(item -> new ItemDto(item.getId(), item.getTitle(), item.getDescription(), item.getImgPath(),
                                 item.getPrice(), cartItem.getCount())));
@@ -43,10 +43,10 @@ public class CartService {
     }
 
     @Transactional
-    public Mono<Void> changeCount(long itemId, CartAction action) {
-        return cartItemRepository.findByItemId(itemId)
+    public Mono<Void> changeCount(String username, long itemId, CartAction action) {
+        return cartItemRepository.findByUsernameAndItemId(username, itemId)
                 .flatMap(cartItem -> changeCount(cartItem, action).thenReturn(cartItem))
-                .switchIfEmpty(Mono.defer(() -> addItem(itemId, action)))
+                .switchIfEmpty(Mono.defer(() -> addItem(username, itemId, action)))
                 .then();
     }
 
@@ -62,12 +62,12 @@ public class CartService {
         return cartItemRepository.save(cartItem).then();
     }
 
-    private Mono<CartItem> addItem(long itemId, CartAction action) {
+    private Mono<CartItem> addItem(String username, long itemId, CartAction action) {
         if (action != CartAction.PLUS) {
             return Mono.empty();
         }
         return itemRepository.findById(itemId)
                 .switchIfEmpty(Mono.error(new NotFoundException("Товар не найден: " + itemId)))
-                .flatMap(item -> cartItemRepository.save(new CartItem(item.getId(), 1)));
+                .flatMap(item -> cartItemRepository.save(new CartItem(username, item.getId(), 1)));
     }
 }

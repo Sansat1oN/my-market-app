@@ -21,8 +21,8 @@ public class CheckoutService {
         this.orderService = orderService;
     }
 
-    public Mono<CheckoutResult> buy() {
-        return cartService.findItems()
+    public Mono<CheckoutResult> buy(String username) {
+        return cartService.findItems(username)
                 .collectList()
                 .map(List::copyOf)
                 .flatMap(items -> {
@@ -32,7 +32,7 @@ public class CheckoutService {
                     return paymentService.pay(cartService.calculateTotal(items))
                             .flatMap(payment -> {
                                 if (payment.status() == PaymentStatus.SUCCESS) {
-                                    return orderService.buy(items)
+                                    return orderService.buy(username, items)
                                             .map(id -> new CheckoutResult(PaymentStatus.SUCCESS, id));
                                 }
                                 return Mono.just(new CheckoutResult(payment.status(), null));

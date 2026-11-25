@@ -12,6 +12,8 @@ import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.service.CheckoutService;
 import ru.yandex.practicum.mymarket.service.OrderService;
 
+import java.security.Principal;
+
 @Controller
 public class OrderController {
 
@@ -46,8 +48,8 @@ public class OrderController {
     }
 
     @PostMapping("/buy")
-    public Mono<String> buy() {
-        return checkoutService.buy()
+    public Mono<String> buy(Principal principal) {
+        return checkoutService.buy(principal.getName())
                 .map(result -> {
                     if (result.status() == PaymentStatus.SUCCESS) {
                         return "redirect:/orders/" + result.orderId() + "?newOrder=true";

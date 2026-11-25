@@ -81,7 +81,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void buy_successfulPayment_redirectsToOrder() {
-        when(checkoutService.buy()).thenReturn(Mono.just(new CheckoutResult(PaymentStatus.SUCCESS, 5L)));
+        when(checkoutService.buy("buyer1")).thenReturn(Mono.just(new CheckoutResult(PaymentStatus.SUCCESS, 5L)));
 
         webTestClient.post()
                 .uri("/buy")
@@ -92,7 +92,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void buy_insufficientFunds_redirectsToCartWithPaymentStatus() {
-        when(checkoutService.buy()).thenReturn(Mono.just(
+        when(checkoutService.buy("buyer1")).thenReturn(Mono.just(
                 new CheckoutResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
 
         webTestClient.post()
@@ -104,7 +104,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void buy_paymentServiceUnavailable_redirectsToCartWithPaymentStatus() {
-        when(checkoutService.buy()).thenReturn(Mono.just(new CheckoutResult(PaymentStatus.UNAVAILABLE, null)));
+        when(checkoutService.buy("buyer1")).thenReturn(Mono.just(new CheckoutResult(PaymentStatus.UNAVAILABLE, null)));
 
         webTestClient.post()
                 .uri("/buy")
@@ -115,7 +115,7 @@ class OrderControllerTest extends AbstractControllerMockTest {
 
     @Test
     void buy_emptyCart_redirectsToCart() {
-        when(checkoutService.buy()).thenReturn(Mono.error(new EmptyCartException("Корзина пуста")));
+        when(checkoutService.buy("buyer1")).thenReturn(Mono.error(new EmptyCartException("Корзина пуста")));
 
         webTestClient.post()
                 .uri("/buy")

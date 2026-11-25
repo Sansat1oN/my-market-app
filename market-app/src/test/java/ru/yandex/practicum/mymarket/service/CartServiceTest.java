@@ -49,19 +49,19 @@ class CartServiceTest {
         when(item.getDescription()).thenReturn("Описание");
         when(item.getImgPath()).thenReturn("images/milk.jpg");
         when(item.getPrice()).thenReturn(100L);
-        when(cartItemRepository.findAll()).thenReturn(Flux.just(new CartItem(1L, 2)));
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.just(new CartItem("buyer1", 1L, 2)));
         when(itemCacheService.findById(1L)).thenReturn(Mono.just(item));
 
-        List<ItemDto> items = cartService.findItems().collectList().block();
+        List<ItemDto> items = cartService.findItems("buyer1").collectList().block();
 
         assertEquals(List.of(new ItemDto(1L, "Молоко", "Описание", "images/milk.jpg", 100L, 2)), items);
     }
 
     @Test
     void findItems_emptyCart_returnsEmptyList() {
-        when(cartItemRepository.findAll()).thenReturn(Flux.empty());
+        when(cartItemRepository.findAllByUsername("buyer1")).thenReturn(Flux.empty());
 
-        assertEquals(List.of(), cartService.findItems().collectList().block());
+        assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
     }
 
     @Test
@@ -82,25 +82,26 @@ class CartServiceTest {
     void changeCount_plusItemNotInCart_addsItemToCart() {
         Item item = mock(Item.class);
         when(item.getId()).thenReturn(1L);
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.empty());
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.empty());
         when(itemRepository.findById(1L)).thenReturn(Mono.just(item));
         when(cartItemRepository.save(any(CartItem.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
 
-        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
 
         ArgumentCaptor<CartItem> captor = ArgumentCaptor.forClass(CartItem.class);
         verify(cartItemRepository).save(captor.capture());
+        assertEquals("buyer1", captor.getValue().getUsername());
         assertEquals(1L, captor.getValue().getItemId());
         assertEquals(1, captor.getValue().getCount());
     }
 
     @Test
     void changeCount_plusItemInCart_increasesCount() {
-        CartItem cartItem = new CartItem(1L, 2);
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(cartItem));
+        CartItem cartItem = new CartItem("buyer1", 1L, 2);
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.just(cartItem));
         when(cartItemRepository.save(cartItem)).thenReturn(Mono.just(cartItem));
 
-        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
 
         assertEquals(3, cartItem.getCount());
         verify(cartItemRepository).save(cartItem);
@@ -108,11 +109,11 @@ class CartServiceTest {
 
     @Test
     void changeCount_minus_decreasesCount() {
-        CartItem cartItem = new CartItem(1L, 2);
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(cartItem));
+        CartItem cartItem = new CartItem("buyer1", 1L, 2);
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.just(cartItem));
         when(cartItemRepository.save(cartItem)).thenReturn(Mono.just(cartItem));
 
-        cartService.changeCount(1L, CartAction.MINUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.MINUS).block();
 
         assertEquals(1, cartItem.getCount());
         verify(cartItemRepository).save(cartItem);
@@ -120,11 +121,11 @@ class CartServiceTest {
 
     @Test
     void changeCount_minusLastItem_removesItemFromCart() {
-        CartItem cartItem = new CartItem(1L, 1);
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(cartItem));
+        CartItem cartItem = new CartItem("buyer1", 1L, 1);
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.just(cartItem));
         when(cartItemRepository.delete(cartItem)).thenReturn(Mono.empty());
 
-        cartService.changeCount(1L, CartAction.MINUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.MINUS).block();
 
         verify(cartItemRepository).delete(cartItem);
         verify(cartItemRepository, never()).save(any());
@@ -132,9 +133,9 @@ class CartServiceTest {
 
     @Test
     void changeCount_minusItemNotInCart_doesNothing() {
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.empty());
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.empty());
 
-        cartService.changeCount(1L, CartAction.MINUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.MINUS).block();
 
         verify(cartItemRepository, never()).save(any());
         verify(cartItemRepository, never()).delete(any());
@@ -143,21 +144,21 @@ class CartServiceTest {
 
     @Test
     void changeCount_delete_removesItemFromCart() {
-        CartItem cartItem = new CartItem(1L, 5);
-        when(cartItemRepository.findByItemId(1L)).thenReturn(Mono.just(cartItem));
+        CartItem cartItem = new CartItem("buyer1", 1L, 5);
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 1L)).thenReturn(Mono.just(cartItem));
         when(cartItemRepository.delete(cartItem)).thenReturn(Mono.empty());
 
-        cartService.changeCount(1L, CartAction.DELETE).block();
+        cartService.changeCount("buyer1", 1L, CartAction.DELETE).block();
 
         verify(cartItemRepository).delete(cartItem);
     }
 
     @Test
     void changeCount_plusUnknownItem_throwsNotFoundException() {
-        when(cartItemRepository.findByItemId(100L)).thenReturn(Mono.empty());
+        when(cartItemRepository.findByUsernameAndItemId("buyer1", 100L)).thenReturn(Mono.empty());
         when(itemRepository.findById(100L)).thenReturn(Mono.empty());
 
-        assertThrows(NotFoundException.class, () -> cartService.changeCount(100L, CartAction.PLUS).block());
+        assertThrows(NotFoundException.class, () -> cartService.changeCount("buyer1", 100L, CartAction.PLUS).block());
 
         verify(cartItemRepository, never()).save(any());
     }

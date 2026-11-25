@@ -33,15 +33,15 @@ public class ItemService {
         this.itemCacheService = itemCacheService;
     }
 
-    public Mono<Page<ItemDto>> findItems(String search, SortType sort, int pageNumber, int pageSize) {
+    public Mono<Page<ItemDto>> findItems(String username, String search, SortType sort, int pageNumber, int pageSize) {
         Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
         Mono<List<Item>> items = itemCacheService.findAll()
                 .map(allItems -> allItems.stream()
                         .filter(item -> matches(item, search))
                         .sorted(toComparator(sort))
                         .toList());
-        Mono<Map<Long, Integer>> counts = cartItemRepository.findAll()
-                .collectMap(CartItem::getItemId, CartItem::getCount);
+        Mono<Map<Long, Integer>> counts = username == null ? Mono.just(Map.of())
+                : cartItemRepository.findAllByUsername(username).collectMap(CartItem::getItemId, CartItem::getCount);
         return Mono.zip(items, counts)
                 .map(result -> {
                     List<Item> foundItems = result.getT1();
@@ -55,12 +55,11 @@ public class ItemService {
                 });
     }
 
-    public Mono<ItemDto> findItem(long id) {
+    public Mono<ItemDto> findItem(String username, long id) {
         Mono<Item> item = itemCacheService.findById(id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Товар не найден: " + id)));
-        Mono<Integer> count = cartItemRepository.findByItemId(id)
-                .map(CartItem::getCount)
-                .defaultIfEmpty(0);
+        Mono<Integer> count = username == null ? Mono.just(0)
+                : cartItemRepository.findByUsernameAndItemId(username, id).map(CartItem::getCount).defaultIfEmpty(0);
         return Mono.zip(item, count)
                 .map(result -> toDto(result.getT1(), result.getT2()));
     }

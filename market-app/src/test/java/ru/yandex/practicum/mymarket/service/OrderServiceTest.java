@@ -81,10 +81,10 @@ class OrderServiceTest {
         when(saved.getId()).thenReturn(5L);
         when(orderRepository.save(any(Order.class))).thenReturn(Mono.just(saved));
         when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        when(cartItemRepository.subtractPurchasedCount(1L, 2)).thenReturn(Mono.just(1));
-        when(cartItemRepository.deleteEmptyItem(1L)).thenReturn(Mono.just(1));
+        when(cartItemRepository.subtractPurchasedCount("buyer1", 1L, 2)).thenReturn(Mono.just(1));
+        when(cartItemRepository.deleteEmptyItem("buyer1", 1L)).thenReturn(Mono.just(1));
 
-        Long id = orderService.buy(items).block();
+        Long id = orderService.buy("buyer1", items).block();
 
         assertEquals(5L, id);
         ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
@@ -93,15 +93,15 @@ class OrderServiceTest {
         assertEquals(1L, captor.getValue().getItemId());
         assertEquals(100L, captor.getValue().getPrice());
         assertEquals(2, captor.getValue().getCount());
-        verify(cartItemRepository).subtractPurchasedCount(1L, 2);
-        verify(cartItemRepository).deleteEmptyItem(1L);
+        verify(cartItemRepository).subtractPurchasedCount("buyer1", 1L, 2);
+        verify(cartItemRepository).deleteEmptyItem("buyer1", 1L);
         verify(cartItemRepository, never()).findAll();
         verifyNoInteractions(itemRepository);
     }
 
     @Test
     void buy_emptyCart_throwsEmptyCartException() {
-        assertThrows(EmptyCartException.class, () -> orderService.buy(List.of()).block());
+        assertThrows(EmptyCartException.class, () -> orderService.buy("buyer1", List.of()).block());
 
         verify(orderRepository, never()).save(any(Order.class));
     }

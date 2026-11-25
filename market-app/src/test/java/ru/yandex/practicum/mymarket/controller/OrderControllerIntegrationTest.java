@@ -5,6 +5,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
@@ -34,6 +36,26 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     private PaymentService paymentService;
 
     @Test
+    void buy_clearsOnlyCurrentBuyersCart() {
+        WebTestClient secondBuyer = signInAs("buyer2");
+        fillCart();
+        allowPayment();
+        secondBuyer.post().uri("/items/1")
+                .body(BodyInserters.fromFormData("action", "PLUS"))
+                .exchange().expectStatus().isOk();
+
+        webTestClient.post().uri("/buy").exchange().expectStatus().is3xxRedirection();
+
+        verify(paymentService).pay(195L);
+        assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
+        secondBuyer.get().uri("/items/1").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertTrue(html.contains("<span>1</span>")));
+        when(paymentService.getBalance()).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
+        secondBuyer.get().uri("/cart/items").exchange().expectStatus().isOk()
+                .expectBody(String.class).value(html -> assertTrue(html.contains("Итого: 50 руб.")));
+    }
+
+    @Test
     void buy_createsOrderAndClearsCart() {
         fillCart();
         allowPayment();
@@ -47,16 +69,16 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
         assertEquals(1, orders.size());
         assertEquals(List.of(milk(), kefir()), orders.get(0).items());
         assertEquals(195L, orders.get(0).totalSum());
-        assertEquals(List.of(), cartService.findItems().collectList().block());
+        assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
     }
 
     @ParameterizedTest
     @CsvSource({"PLUS, 50", "MINUS, 50", "DELETE, 50", "PLUS, 150"})
     void buy_cartOrPriceChangesDuringPayment_createsOrderFromPaidSnapshot(CartAction action, long newPrice) {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        List<ItemDto> paidItems = cartService.findItems().collectList().block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
         when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
-                cartService.changeCount(1L, action)
+                cartService.changeCount("buyer1", 1L, action)
                         .then(databaseClient.sql("update items set price = :price where id = 1")
                                 .bind("price", newPrice).then())
                         .thenReturn(new PaymentResult(PaymentStatus.SUCCESS, 950L))));
@@ -72,7 +94,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
             assertEquals(paidItems, orders.get(0).items());
             assertEquals(50L, orders.get(0).totalSum());
             verify(paymentService).pay(50L);
-            List<ItemDto> remainingItems = cartService.findItems().collectList().block();
+            List<ItemDto> remainingItems = cartService.findItems("buyer1").collectList().block();
             assertEquals(action == CartAction.PLUS ? 1 : 0, remainingItems.size());
             if (action == CartAction.PLUS) {
                 assertEquals(1, remainingItems.get(0).count());
@@ -84,10 +106,10 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void buy_anotherItemAddedDuringPayment_keepsItInCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        List<ItemDto> paidItems = cartService.findItems().collectList().block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
         when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
-                cartService.changeCount(2L, CartAction.PLUS)
+                cartService.changeCount("buyer1", 2L, CartAction.PLUS)
                         .thenReturn(new PaymentResult(PaymentStatus.SUCCESS, 950L))));
 
         webTestClient.post()
@@ -99,7 +121,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
         assertEquals(1, orders.size());
         assertEquals(paidItems, orders.get(0).items());
         assertEquals(50L, orders.get(0).totalSum());
-        assertEquals(List.of(kefir()), cartService.findItems().collectList().block());
+        assertEquals(List.of(kefir()), cartService.findItems("buyer1").collectList().block());
         verify(paymentService).pay(50L);
     }
 
@@ -167,13 +189,13 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                 });
 
         assertEquals(List.of(), orderService.findOrders().collectList().block());
-        assertEquals(List.of(milk(), kefir()), cartService.findItems().collectList().block());
+        assertEquals(List.of(milk(), kefir()), cartService.findItems("buyer1").collectList().block());
     }
 
     @Test
     void getOrders_returnsOrders() {
         fillCart();
-        long id = orderService.buy(cartService.findItems().collectList().block()).block();
+        long id = orderService.buy("buyer1", cartService.findItems("buyer1").collectList().block()).block();
 
         webTestClient.get()
                 .uri("/orders")
@@ -191,7 +213,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     @Test
     void getOrder_newOrder_returnsOrderWithCongratulation() {
         fillCart();
-        long id = orderService.buy(cartService.findItems().collectList().block()).block();
+        long id = orderService.buy("buyer1", cartService.findItems("buyer1").collectList().block()).block();
 
         webTestClient.get()
                 .uri("/orders/{id}?newOrder=true", id)
@@ -224,9 +246,9 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     }
 
     private void fillCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(2L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 2L, CartAction.PLUS).block();
     }
 
     private ItemDto milk() {

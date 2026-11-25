@@ -24,7 +24,7 @@ class ItemControllerTest extends AbstractControllerMockTest {
     @Test
     void getItems_withoutParams_usesDefaults() {
         List<ItemDto> items = List.of(item(1L, 0));
-        when(itemService.findItems(null, SortType.NO, 1, 5))
+        when(itemService.findItems("buyer1", null, SortType.NO, 1, 5))
                 .thenReturn(Mono.just(new PageImpl<>(items, PageRequest.of(0, 5), 1)));
         when(itemService.splitIntoRows(items)).thenReturn(List.of(List.of(item(1L, 0), stub(), stub())));
 
@@ -47,7 +47,7 @@ class ItemControllerTest extends AbstractControllerMockTest {
     @Test
     void getItems_rootWithParams_returnsRequestedPage() {
         List<ItemDto> items = List.of(item(3L, 0), item(4L, 2));
-        when(itemService.findItems("мол", SortType.PRICE, 2, 2))
+        when(itemService.findItems("buyer1", "мол", SortType.PRICE, 2, 2))
                 .thenReturn(Mono.just(new PageImpl<>(items, PageRequest.of(1, 2), 7)));
         when(itemService.splitIntoRows(items)).thenReturn(List.of(List.of(item(3L, 0), item(4L, 2), stub())));
 
@@ -74,7 +74,7 @@ class ItemControllerTest extends AbstractControllerMockTest {
 
     @Test
     void changeCountOnItems_redirectsWithParams() {
-        when(cartService.changeCount(1L, CartAction.PLUS)).thenReturn(Mono.empty());
+        when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/items")
@@ -88,12 +88,12 @@ class ItemControllerTest extends AbstractControllerMockTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/items?search=milk&sort=ALPHA&pageNumber=2&pageSize=10");
 
-        verify(cartService).changeCount(1L, CartAction.PLUS);
+        verify(cartService).changeCount("buyer1", 1L, CartAction.PLUS);
     }
 
     @Test
     void changeCountOnItems_withoutSearch_redirectsWithoutSearch() {
-        when(cartService.changeCount(1L, CartAction.MINUS)).thenReturn(Mono.empty());
+        when(cartService.changeCount("buyer1", 1L, CartAction.MINUS)).thenReturn(Mono.empty());
 
         webTestClient.post()
                 .uri("/items")
@@ -106,12 +106,12 @@ class ItemControllerTest extends AbstractControllerMockTest {
                 .expectStatus().is3xxRedirection()
                 .expectHeader().location("/items?sort=NO&pageNumber=1&pageSize=5");
 
-        verify(cartService).changeCount(1L, CartAction.MINUS);
+        verify(cartService).changeCount("buyer1", 1L, CartAction.MINUS);
     }
 
     @Test
     void getItem_returnsItem() {
-        when(itemService.findItem(1L)).thenReturn(Mono.just(item(1L, 2)));
+        when(itemService.findItem("buyer1", 1L)).thenReturn(Mono.just(item(1L, 2)));
 
         webTestClient.get()
                 .uri("/items/{id}", 1L)
@@ -127,7 +127,7 @@ class ItemControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getItem_itemNotFound_404() {
-        when(itemService.findItem(100L)).thenReturn(Mono.error(new NotFoundException("Товар не найден: 100")));
+        when(itemService.findItem("buyer1", 100L)).thenReturn(Mono.error(new NotFoundException("Товар не найден: 100")));
 
         webTestClient.get()
                 .uri("/items/{id}", 100L)
@@ -137,8 +137,8 @@ class ItemControllerTest extends AbstractControllerMockTest {
 
     @Test
     void changeCountOnItem_returnsItemWithNewCount() {
-        when(cartService.changeCount(1L, CartAction.PLUS)).thenReturn(Mono.empty());
-        when(itemService.findItem(1L)).thenReturn(Mono.just(item(1L, 3)));
+        when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
+        when(itemService.findItem("buyer1", 1L)).thenReturn(Mono.just(item(1L, 3)));
 
         webTestClient.post()
                 .uri("/items/{id}", 1L)
@@ -151,7 +151,7 @@ class ItemControllerTest extends AbstractControllerMockTest {
                     assertTrue(html.contains("<span>3</span>"));
                 });
 
-        verify(cartService).changeCount(1L, CartAction.PLUS);
+        verify(cartService).changeCount("buyer1", 1L, CartAction.PLUS);
     }
 
     private ItemDto item(long id, int count) {

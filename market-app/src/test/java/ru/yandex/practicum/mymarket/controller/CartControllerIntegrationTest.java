@@ -29,9 +29,9 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void getCart_returnsItemsAndTotal() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(2L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 2L, CartAction.PLUS).block();
 
         webTestClient.get()
                 .uri("/cart/items")
@@ -49,7 +49,7 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void changeCountOnCart_plus_increasesCount() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -66,7 +66,7 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void changeCountOnCart_minusLastItem_removesItemFromCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
 
         webTestClient.post()
                 .uri("/cart/items")
@@ -83,9 +83,9 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void changeCountOnCart_delete_removesItemFromCart() {
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(1L, CartAction.PLUS).block();
-        cartService.changeCount(2L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
+        cartService.changeCount("buyer1", 2L, CartAction.PLUS).block();
 
         webTestClient.post()
                 .uri("/cart/items")

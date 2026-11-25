@@ -12,6 +12,8 @@ import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.PaymentService;
 
+import java.security.Principal;
+
 @Controller
 public class CartController {
 
@@ -25,23 +27,23 @@ public class CartController {
 
     @GetMapping("/cart/items")
     public Mono<String> getCart(@RequestParam(name = "paymentStatus", required = false) String paymentStatus,
-                                Model model) {
+                                Principal principal, Model model) {
         if (PaymentStatus.INSUFFICIENT_FUNDS.name().equals(paymentStatus)) {
             model.addAttribute("checkoutError", "Оплата не прошла: недостаточно средств. Заказ не оформлен.");
         } else if (PaymentStatus.UNAVAILABLE.name().equals(paymentStatus)) {
             model.addAttribute("checkoutError", "Оплата не прошла: сервис платежей недоступен. Заказ не оформлен.");
         }
-        return showCart(model);
+        return showCart(principal.getName(), model);
     }
 
     @PostMapping("/cart/items")
-    public Mono<String> changeCountOnCart(@ModelAttribute CartForm form, Model model) {
-        return cartService.changeCount(form.id(), form.action())
-                .then(showCart(model));
+    public Mono<String> changeCountOnCart(@ModelAttribute CartForm form, Principal principal, Model model) {
+        return cartService.changeCount(principal.getName(), form.id(), form.action())
+                .then(showCart(principal.getName(), model));
     }
 
-    private Mono<String> showCart(Model model) {
-        return cartService.findItems()
+    private Mono<String> showCart(String username, Model model) {
+        return cartService.findItems(username)
                 .collectList()
                 .flatMap(items -> {
                     model.addAttribute("items", items);
