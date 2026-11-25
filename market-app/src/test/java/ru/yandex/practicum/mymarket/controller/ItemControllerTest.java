@@ -136,20 +136,13 @@ class ItemControllerTest extends AbstractControllerMockTest {
     }
 
     @Test
-    void changeCountOnItem_returnsItemWithNewCount() {
+    void changeCountOnItem_redirectsToItem() {
         when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
-        when(itemService.findItem("buyer1", 1L)).thenReturn(Mono.just(item(1L, 3)));
 
         webTestClient.post()
                 .uri("/items/{id}", 1L)
                 .body(BodyInserters.fromFormData("action", "PLUS"))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .value(html -> {
-                    assertTrue(html.contains("Товар 1"));
-                    assertTrue(html.contains("<span>3</span>"));
-                });
+                .exchange().expectStatus().isSeeOther().expectHeader().location("/items/1");
 
         verify(cartService).changeCount("buyer1", 1L, CartAction.PLUS);
     }

@@ -13,6 +13,9 @@ public interface CartItemRepository extends ReactiveCrudRepository<CartItem, Lon
 
     Flux<CartItem> findAllByUsername(String username);
 
+    @Query("SELECT username FROM customers WHERE username = :username FOR UPDATE")
+    Mono<String> lockCartOwner(String username);
+
     Mono<CartItem> findByUsernameAndItemId(String username, long itemId);
 
     @Modifying

@@ -1,5 +1,7 @@
 package ru.yandex.practicum.mymarket.controller;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,8 +34,8 @@ public class ItemController {
     @GetMapping({"/", "/items"})
     public Mono<String> getItems(@RequestParam(name = "search", required = false) String search,
                                  @RequestParam(name = "sort", defaultValue = "NO") SortType sort,
-                                 @RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber,
-                                 @RequestParam(name = "pageSize", defaultValue = "5") int pageSize,
+                                 @RequestParam(name = "pageNumber", defaultValue = "1") @Positive int pageNumber,
+                                 @RequestParam(name = "pageSize", defaultValue = "5") @Positive int pageSize,
                                  Principal principal, Model model) {
         String username = principal == null ? null : principal.getName();
         return itemService.findItems(username, search, sort, pageNumber, pageSize)
@@ -47,7 +49,7 @@ public class ItemController {
     }
 
     @PostMapping("/items")
-    public Mono<String> changeCountOnItems(@ModelAttribute ItemsForm form, Principal principal) {
+    public Mono<String> changeCountOnItems(@Valid @ModelAttribute ItemsForm form, Principal principal) {
         UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/items");
         if (form.search() != null) {
             redirect.queryParam("search", form.search());
@@ -71,14 +73,9 @@ public class ItemController {
 
     @PostMapping("/items/{id}")
     public Mono<String> changeCountOnItem(@PathVariable(name = "id") long id,
-                                          @ModelAttribute ItemForm form,
-                                          Principal principal, Model model) {
-        String username = principal.getName();
-        return cartService.changeCount(username, id, form.action())
-                .then(itemService.findItem(username, id))
-                .map(item -> {
-                    model.addAttribute("item", item);
-                    return "item";
-                });
+                                          @Valid @ModelAttribute ItemForm form,
+                                          Principal principal) {
+        return cartService.changeCount(principal.getName(), id, form.action())
+                .thenReturn("redirect:/items/" + id);
     }
 }

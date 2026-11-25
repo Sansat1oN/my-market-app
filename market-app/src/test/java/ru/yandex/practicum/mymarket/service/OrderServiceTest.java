@@ -78,6 +78,7 @@ class OrderServiceTest {
     void buy_createsOrderFromSnapshotAndRemovesPurchasedCount() {
         List<ItemDto> items = List.of(new ItemDto(1L, "Товар 1", "Описание", "images/1.jpg", 100L, 2));
         Order saved = mock(Order.class);
+        when(cartItemRepository.lockCartOwner("buyer1")).thenReturn(Mono.just("buyer1"));
         when(saved.getId()).thenReturn(5L);
         when(orderRepository.save(any(Order.class))).thenReturn(Mono.just(saved));
         when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));

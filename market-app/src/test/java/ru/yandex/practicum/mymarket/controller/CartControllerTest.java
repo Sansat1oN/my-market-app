@@ -97,25 +97,13 @@ class CartControllerTest extends AbstractControllerMockTest {
     }
 
     @Test
-    void changeCountOnCart_returnsCartWithNewCount() {
-        List<ItemDto> items = List.of(item(1L, 3));
+    void changeCountOnCart_redirectsToCart() {
         when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
-        when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
-        when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
-                new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.post()
                 .uri("/cart/items")
-                .body(BodyInserters.fromFormData("id", "1")
-                        .with("action", "PLUS"))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .value(html -> {
-                    assertTrue(html.contains("<span>3</span>"));
-                    assertTrue(html.contains("Итого: 300 руб."));
-                });
+                .body(BodyInserters.fromFormData("id", "1").with("action", "PLUS"))
+                .exchange().expectStatus().isSeeOther().expectHeader().location("/cart/items");
 
         verify(cartService).changeCount("buyer1", 1L, CartAction.PLUS);
     }
@@ -123,14 +111,12 @@ class CartControllerTest extends AbstractControllerMockTest {
     @Test
     void changeCountOnCart_delete_callsServiceWithDelete() {
         when(cartService.changeCount("buyer1", 1L, CartAction.DELETE)).thenReturn(Mono.empty());
-        when(cartService.findItems("buyer1")).thenReturn(Flux.empty());
-
         webTestClient.post()
                 .uri("/cart/items")
                 .body(BodyInserters.fromFormData("id", "1")
                         .with("action", "DELETE"))
                 .exchange()
-                .expectStatus().isOk();
+                .expectStatus().isSeeOther().expectHeader().location("/cart/items");
 
         verify(cartService).changeCount("buyer1", 1L, CartAction.DELETE);
     }

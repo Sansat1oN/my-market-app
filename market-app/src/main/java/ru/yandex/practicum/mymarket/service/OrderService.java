@@ -52,7 +52,8 @@ public class OrderService {
         if (snapshot.isEmpty()) {
             return Mono.error(new EmptyCartException("Корзина пуста"));
         }
-        return orderRepository.save(new Order(username))
+        return cartItemRepository.lockCartOwner(username)
+                .then(orderRepository.save(new Order(username)))
                 .flatMap(order -> saveOrderItems(order, snapshot)
                         .then(removePurchasedItems(username, snapshot))
                         .thenReturn(order.getId()));

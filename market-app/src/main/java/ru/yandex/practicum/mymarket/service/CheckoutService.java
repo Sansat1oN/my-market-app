@@ -7,10 +7,13 @@ import ru.yandex.practicum.mymarket.dto.PaymentStatus;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 public class CheckoutService {
 
+    private final ConcurrentMap<String, Mono<CheckoutResult>> activePurchases = new ConcurrentHashMap<>();
     private final CartService cartService;
     private final PaymentService paymentService;
     private final OrderService orderService;
@@ -22,6 +25,13 @@ public class CheckoutService {
     }
 
     public Mono<CheckoutResult> buy(String username) {
+        return Mono.defer(() -> activePurchases.computeIfAbsent(username, buyer ->
+                Mono.defer(() -> checkout(buyer))
+                        .doOnTerminate(() -> activePurchases.remove(buyer))
+                        .cache()));
+    }
+
+    private Mono<CheckoutResult> checkout(String username) {
         return cartService.findItems(username)
                 .collectList()
                 .map(List::copyOf)

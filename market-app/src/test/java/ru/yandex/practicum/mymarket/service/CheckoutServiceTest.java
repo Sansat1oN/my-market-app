@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import ru.yandex.practicum.mymarket.dto.CheckoutResult;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.PaymentResult;
@@ -19,6 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +71,23 @@ class CheckoutServiceTest {
         assertEquals(new CheckoutResult(PaymentStatus.UNAVAILABLE, null), checkoutService.buy("buyer1").block());
 
         verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void overlappingPurchasesOfSameCartChargeOnce() {
+        List<ItemDto> items = fillCart();
+        Sinks.One<PaymentResult> payment = Sinks.one();
+        when(paymentService.pay("buyer1", 200L)).thenReturn(payment.asMono());
+        when(orderService.buy("buyer1", items)).thenReturn(Mono.just(5L));
+
+        var first = checkoutService.buy("buyer1").toFuture();
+        var second = checkoutService.buy("buyer1").toFuture();
+        payment.tryEmitValue(new PaymentResult(PaymentStatus.SUCCESS, 800L));
+
+        assertEquals(new CheckoutResult(PaymentStatus.SUCCESS, 5L), first.join());
+        assertEquals(first.join(), second.join());
+        verify(paymentService).pay("buyer1", 200L);
+        verify(orderService).buy("buyer1", items);
     }
 
     @Test

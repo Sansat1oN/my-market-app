@@ -1,6 +1,8 @@
 package ru.yandex.practicum.mymarket.controller;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.BodyInserters;
 
@@ -8,6 +10,26 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItemControllerIntegrationTest extends AbstractBuyerControllerTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pageNumber=0", "pageSize=-1"})
+    void invalidPageReturnsBadRequest(String params) {
+        guest.get().uri("/items?" + params).exchange().expectStatus().isBadRequest();
+    }
+
+    @Test
+    void largePageNumberReturnsEmptyPage() {
+        guest.get().uri("/items?pageNumber=30000000&pageSize=100").exchange()
+                .expectStatus().isOk().expectBody(String.class)
+                .value(html -> assertFalse(html.contains("class=\"card-title\"")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/items", "/items/1", "/cart/items"})
+    void missingCartActionReturnsBadRequest(String path) {
+        webTestClient.post().uri(path).body(BodyInserters.fromFormData("id", "1"))
+                .exchange().expectStatus().isBadRequest();
+    }
 
     @Test
     void getItems_withoutParams_returnsFirstPage() {
@@ -85,6 +107,10 @@ class ItemControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .uri("/items/{id}", 1L)
                 .body(BodyInserters.fromFormData("action", "PLUS"))
                 .exchange()
+                .expectStatus().isSeeOther()
+                .expectHeader().location("/items/1");
+
+        webTestClient.get().uri("/items/1").exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> {
@@ -96,6 +122,10 @@ class ItemControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .uri("/items/{id}", 1L)
                 .body(BodyInserters.fromFormData("action", "MINUS"))
                 .exchange()
+                .expectStatus().isSeeOther()
+                .expectHeader().location("/items/1");
+
+        webTestClient.get().uri("/items/1").exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> assertTrue(html.contains("<span>0</span>")));

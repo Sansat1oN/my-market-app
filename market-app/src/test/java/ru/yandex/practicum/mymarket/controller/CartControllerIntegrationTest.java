@@ -3,10 +3,13 @@ package ru.yandex.practicum.mymarket.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.reactive.function.BodyInserters;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.service.CartService;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
@@ -48,6 +51,15 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
     }
 
     @Test
+    void simultaneousAdditionsKeepEveryUnit() {
+        Flux.range(0, 4)
+                .flatMap(i -> cartService.changeCount("buyer1", 1L, CartAction.PLUS).subscribeOn(Schedulers.parallel()))
+                .then().block();
+
+        assertEquals(4, cartService.findItems("buyer1").single().block().count());
+    }
+
+    @Test
     void changeCountOnCart_plus_increasesCount() {
         cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
 
@@ -56,6 +68,10 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .body(BodyInserters.fromFormData("id", "1")
                         .with("action", "PLUS"))
                 .exchange()
+                .expectStatus().isSeeOther()
+                .expectHeader().location("/cart/items");
+
+        webTestClient.get().uri("/cart/items").exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> {
@@ -73,6 +89,10 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .body(BodyInserters.fromFormData("id", "1")
                         .with("action", "MINUS"))
                 .exchange()
+                .expectStatus().isSeeOther()
+                .expectHeader().location("/cart/items");
+
+        webTestClient.get().uri("/cart/items").exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> {
@@ -92,6 +112,10 @@ class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
                 .body(BodyInserters.fromFormData("id", "1")
                         .with("action", "DELETE"))
                 .exchange()
+                .expectStatus().isSeeOther()
+                .expectHeader().location("/cart/items");
+
+        webTestClient.get().uri("/cart/items").exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> {

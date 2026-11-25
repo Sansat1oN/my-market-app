@@ -1,4 +1,6 @@
 package ru.yandex.practicum.mymarket.dto;
 
-public record CartForm(long id, CartAction action) {
+import jakarta.validation.constraints.NotNull;
+
+public record CartForm(long id, @NotNull CartAction action) {
 }

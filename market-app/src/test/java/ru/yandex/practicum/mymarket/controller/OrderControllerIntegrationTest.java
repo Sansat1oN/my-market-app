@@ -43,7 +43,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
         allowPayment();
         secondBuyer.post().uri("/items/1")
                 .body(BodyInserters.fromFormData("action", "PLUS"))
-                .exchange().expectStatus().isOk();
+                .exchange().expectStatus().isSeeOther().expectHeader().location("/items/1");
 
         webTestClient.post().uri("/buy").exchange().expectStatus().is3xxRedirection();
 

@@ -45,8 +45,8 @@ public class ItemService {
         return Mono.zip(items, counts)
                 .map(result -> {
                     List<Item> foundItems = result.getT1();
-                    int from = Math.min((pageNumber - 1) * pageSize, foundItems.size());
-                    int to = Math.min(from + pageSize, foundItems.size());
+                    int from = (int) Math.min(pageable.getOffset(), foundItems.size());
+                    int to = (int) Math.min((long) from + pageSize, foundItems.size());
                     List<ItemDto> content = new ArrayList<>();
                     for (Item item : foundItems.subList(from, to)) {
                         content.add(toDto(item, result.getT2().getOrDefault(item.getId(), 0)));
@@ -82,7 +82,7 @@ public class ItemService {
         }
         String query = search.toLowerCase(Locale.ROOT);
         return item.getTitle().toLowerCase(Locale.ROOT).contains(query)
-                || item.getDescription().toLowerCase(Locale.ROOT).contains(query);
+                || (item.getDescription() != null && item.getDescription().toLowerCase(Locale.ROOT).contains(query));
     }
 
     private Comparator<Item> toComparator(SortType sort) {

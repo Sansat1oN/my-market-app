@@ -1,5 +1,6 @@
 package ru.yandex.practicum.mymarket.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,9 +38,9 @@ public class CartController {
     }
 
     @PostMapping("/cart/items")
-    public Mono<String> changeCountOnCart(@ModelAttribute CartForm form, Principal principal, Model model) {
+    public Mono<String> changeCountOnCart(@Valid @ModelAttribute CartForm form, Principal principal) {
         return cartService.changeCount(principal.getName(), form.id(), form.action())
-                .then(showCart(principal.getName(), model));
+                .thenReturn("redirect:/cart/items");
     }
 
     private Mono<String> showCart(String username, Model model) {

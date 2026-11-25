@@ -44,7 +44,8 @@ public class CartService {
 
     @Transactional
     public Mono<Void> changeCount(String username, long itemId, CartAction action) {
-        return cartItemRepository.findByUsernameAndItemId(username, itemId)
+        return cartItemRepository.lockCartOwner(username)
+                .then(cartItemRepository.findByUsernameAndItemId(username, itemId))
                 .flatMap(cartItem -> changeCount(cartItem, action).thenReturn(cartItem))
                 .switchIfEmpty(Mono.defer(() -> addItem(username, itemId, action)))
                 .then();
