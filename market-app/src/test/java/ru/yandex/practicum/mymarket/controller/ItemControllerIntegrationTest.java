@@ -3,12 +3,11 @@ package ru.yandex.practicum.mymarket.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.BodyInserters;
-import ru.yandex.practicum.mymarket.AbstractTest;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ItemControllerIntegrationTest extends AbstractTest {
+class ItemControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Test
     void getItems_withoutParams_returnsFirstPage() {

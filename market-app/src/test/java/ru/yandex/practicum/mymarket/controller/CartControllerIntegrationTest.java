@@ -3,14 +3,13 @@ package ru.yandex.practicum.mymarket.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.reactive.function.BodyInserters;
-import ru.yandex.practicum.mymarket.AbstractTest;
 import ru.yandex.practicum.mymarket.dto.CartAction;
 import ru.yandex.practicum.mymarket.service.CartService;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CartControllerIntegrationTest extends AbstractTest {
+class CartControllerIntegrationTest extends AbstractBuyerControllerTest {
 
     @Autowired
     private CartService cartService;
