@@ -1,3 +1,9 @@
+CREATE TABLE IF NOT EXISTS customers
+(
+    username      VARCHAR(255) PRIMARY KEY,
+    password_hash VARCHAR(60)  NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS items
 (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,

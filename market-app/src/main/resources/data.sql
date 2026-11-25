@@ -1,3 +1,7 @@
+MERGE INTO customers (username, password_hash) KEY (username)
+VALUES ('buyer1', '$2b$10$S1UbCP2vseWrsMhWN/mXEuXMkb32X04zb/1przm7IfZz2Q2TOajxC'),
+       ('buyer2', '$2b$10$2Z28jz5Rd5rwff49o7AS9OPAh79ZpMZpmpo/bzE74cuglWK8IZXd6');
+
 INSERT INTO items (title, description, img_path, price)
 VALUES ('Молоко ЛЕНТА пастеризованное', 'Молоко питьевое пастеризованное 2,5%, 900 мл', 'images/milk.jpg', 50),
        ('Кефир ПРОСТОКВАШИНО', 'Кефир 2,5%, без змж, 930 г', 'images/kefir.jpg', 95),
