@@ -52,7 +52,7 @@ public class CartController {
                     if (items.isEmpty()) {
                         return Mono.just("cart");
                     }
-                    return paymentService.getBalance()
+                    return paymentService.getBalance(username)
                             .map(payment -> {
                                 boolean canBuy = payment.status() == PaymentStatus.SUCCESS
                                         && payment.balance() >= total;

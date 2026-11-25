@@ -47,11 +47,11 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
 
         webTestClient.post().uri("/buy").exchange().expectStatus().is3xxRedirection();
 
-        verify(paymentService).pay(195L);
+        verify(paymentService).pay("buyer1", 195L);
         assertEquals(List.of(), cartService.findItems("buyer1").collectList().block());
         secondBuyer.get().uri("/items/1").exchange().expectStatus().isOk()
                 .expectBody(String.class).value(html -> assertTrue(html.contains("<span>1</span>")));
-        when(paymentService.getBalance()).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
+        when(paymentService.getBalance("buyer2")).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 1000L)));
         secondBuyer.get().uri("/cart/items").exchange().expectStatus().isOk()
                 .expectBody(String.class).value(html -> assertTrue(html.contains("Итого: 50 руб.")));
     }
@@ -78,7 +78,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     void buy_cartOrPriceChangesDuringPayment_createsOrderFromPaidSnapshot(CartAction action, long newPrice) {
         cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
         List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
-        when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
+        when(paymentService.pay("buyer1", 50L)).thenReturn(Mono.defer(() ->
                 cartService.changeCount("buyer1", 1L, action)
                         .then(databaseClient.sql("update items set price = :price where id = 1")
                                 .bind("price", newPrice).then())
@@ -94,7 +94,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
             assertEquals(1, orders.size());
             assertEquals(paidItems, orders.get(0).items());
             assertEquals(50L, orders.get(0).totalSum());
-            verify(paymentService).pay(50L);
+            verify(paymentService).pay("buyer1", 50L);
             List<ItemDto> remainingItems = cartService.findItems("buyer1").collectList().block();
             assertEquals(action == CartAction.PLUS ? 1 : 0, remainingItems.size());
             if (action == CartAction.PLUS) {
@@ -109,7 +109,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     void buy_anotherItemAddedDuringPayment_keepsItInCart() {
         cartService.changeCount("buyer1", 1L, CartAction.PLUS).block();
         List<ItemDto> paidItems = cartService.findItems("buyer1").collectList().block();
-        when(paymentService.pay(50L)).thenReturn(Mono.defer(() ->
+        when(paymentService.pay("buyer1", 50L)).thenReturn(Mono.defer(() ->
                 cartService.changeCount("buyer1", 2L, CartAction.PLUS)
                         .thenReturn(new PaymentResult(PaymentStatus.SUCCESS, 950L))));
 
@@ -123,7 +123,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
         assertEquals(paidItems, orders.get(0).items());
         assertEquals(50L, orders.get(0).totalSum());
         assertEquals(List.of(kefir()), cartService.findItems("buyer1").collectList().block());
-        verify(paymentService).pay(50L);
+        verify(paymentService).pay("buyer1", 50L);
     }
 
     @Test
@@ -164,9 +164,9 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
                                                                PaymentStatus balanceStatus, long balance,
                                                                boolean disabled, String message) {
         fillCart();
-        when(paymentService.pay(195L)).thenReturn(Mono.just(
+        when(paymentService.pay("buyer1", 195L)).thenReturn(Mono.just(
                 new PaymentResult(paymentStatus, null)));
-        when(paymentService.getBalance()).thenReturn(Mono.just(new PaymentResult(balanceStatus, balance)));
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(new PaymentResult(balanceStatus, balance)));
 
         String url = webTestClient.post()
                 .uri("/buy")
@@ -263,7 +263,7 @@ class OrderControllerIntegrationTest extends AbstractBuyerControllerTest {
     }
 
     private void allowPayment() {
-        when(paymentService.pay(195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
+        when(paymentService.pay("buyer1", 195L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 805L)));
     }
 
     private void fillCart() {

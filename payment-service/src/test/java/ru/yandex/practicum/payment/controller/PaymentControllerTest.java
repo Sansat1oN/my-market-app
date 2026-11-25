@@ -7,19 +7,17 @@ import ru.yandex.practicum.payment.AbstractControllerMockTest;
 import ru.yandex.practicum.payment.domain.PaymentRequest;
 import ru.yandex.practicum.payment.exception.InsufficientFundsException;
 
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PaymentControllerTest extends AbstractControllerMockTest {
 
     @Test
     void getBalance_returnsBalance() {
-        when(paymentService.getBalance()).thenReturn(Mono.just(1000L));
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(1000L));
 
         webTestClient.get()
-                .uri("/balance")
+                .uri("/balance?username=buyer1")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
@@ -29,10 +27,10 @@ class PaymentControllerTest extends AbstractControllerMockTest {
 
     @Test
     void createPayment_returnsRestOfBalance() {
-        when(paymentService.pay(300L)).thenReturn(Mono.just(700L));
+        when(paymentService.pay("buyer1", 300L)).thenReturn(Mono.just(700L));
 
         webTestClient.post()
-                .uri("/payments")
+                .uri("/payments?username=buyer1")
                 .bodyValue(new PaymentRequest(300L))
                 .exchange()
                 .expectStatus().isOk()
@@ -43,10 +41,10 @@ class PaymentControllerTest extends AbstractControllerMockTest {
 
     @Test
     void createPayment_insufficientFunds_returnsConflict() {
-        when(paymentService.pay(800L)).thenReturn(Mono.error(new InsufficientFundsException("Недостаточно средств")));
+        when(paymentService.pay("buyer1", 800L)).thenReturn(Mono.error(new InsufficientFundsException("Недостаточно средств")));
 
         webTestClient.post()
-                .uri("/payments")
+                .uri("/payments?username=buyer1")
                 .bodyValue(new PaymentRequest(800L))
                 .exchange()
                 .expectStatus().isEqualTo(409)
@@ -55,25 +53,38 @@ class PaymentControllerTest extends AbstractControllerMockTest {
     }
 
     @Test
+    void getBalance_withoutUsername_returnsBadRequest() {
+        webTestClient.get().uri("/balance").exchange().expectStatus().isBadRequest();
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    void createPayment_withoutUsername_returnsBadRequest() {
+        webTestClient.post().uri("/payments").bodyValue(new PaymentRequest(100L))
+                .exchange().expectStatus().isBadRequest();
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
     void createPayment_withoutAmount_returnsBadRequest() {
         webTestClient.post()
-                .uri("/payments")
+                .uri("/payments?username=buyer1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{}")
                 .exchange()
                 .expectStatus().isBadRequest();
 
-        verify(paymentService, never()).pay(anyLong());
+        verifyNoInteractions(paymentService);
     }
 
     @Test
     void createPayment_zeroAmount_returnsBadRequest() {
         webTestClient.post()
-                .uri("/payments")
+                .uri("/payments?username=buyer1")
                 .bodyValue(new PaymentRequest(0L))
                 .exchange()
                 .expectStatus().isBadRequest();
 
-        verify(paymentService, never()).pay(anyLong());
+        verifyNoInteractions(paymentService);
     }
 }

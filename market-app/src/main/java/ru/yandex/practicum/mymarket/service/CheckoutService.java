@@ -29,7 +29,7 @@ public class CheckoutService {
                     if (items.isEmpty()) {
                         return Mono.error(new EmptyCartException("Корзина пуста"));
                     }
-                    return paymentService.pay(cartService.calculateTotal(items))
+                    return paymentService.pay(username, cartService.calculateTotal(items))
                             .flatMap(payment -> {
                                 if (payment.status() == PaymentStatus.SUCCESS) {
                                     return orderService.buy(username, items)

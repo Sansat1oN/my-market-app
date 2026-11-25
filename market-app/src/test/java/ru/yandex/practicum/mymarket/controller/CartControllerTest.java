@@ -25,7 +25,7 @@ class CartControllerTest extends AbstractControllerMockTest {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
         when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.get()
@@ -47,7 +47,7 @@ class CartControllerTest extends AbstractControllerMockTest {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
         when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.SUCCESS, 299L)));
 
         webTestClient.get()
@@ -66,7 +66,7 @@ class CartControllerTest extends AbstractControllerMockTest {
         List<ItemDto> items = List.of(item(1L, 2), item(2L, 1));
         when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
 
         webTestClient.get()
@@ -102,7 +102,7 @@ class CartControllerTest extends AbstractControllerMockTest {
         when(cartService.changeCount("buyer1", 1L, CartAction.PLUS)).thenReturn(Mono.empty());
         when(cartService.findItems("buyer1")).thenReturn(Flux.fromIterable(items));
         when(cartService.calculateTotal(items)).thenReturn(300L);
-        when(paymentService.getBalance()).thenReturn(Mono.just(
+        when(paymentService.getBalance("buyer1")).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.SUCCESS, 300L)));
 
         webTestClient.post()

@@ -46,24 +46,24 @@ class PaymentServiceIntegrationTest extends AbstractTest {
     void getBalance_returnsBalance() throws InterruptedException {
         enqueueJson(200, "{\"balance\":1000}");
 
-        PaymentResult result = paymentService.getBalance().block();
+        PaymentResult result = paymentService.getBalance("buyer1").block();
 
         assertEquals(new PaymentResult(PaymentStatus.SUCCESS, 1000L), result);
         RecordedRequest request = SERVER.takeRequest();
         assertEquals("GET", request.getMethod());
-        assertEquals("/balance", request.getPath());
+        assertEquals("/balance?username=buyer1", request.getPath());
     }
 
     @Test
     void pay_returnsRemainingBalance() throws InterruptedException {
         enqueueJson(200, "{\"balance\":900}");
 
-        PaymentResult result = paymentService.pay(100L).block();
+        PaymentResult result = paymentService.pay("buyer2", 100L).block();
 
         assertEquals(new PaymentResult(PaymentStatus.SUCCESS, 900L), result);
         RecordedRequest request = SERVER.takeRequest();
         assertEquals("POST", request.getMethod());
-        assertEquals("/payments", request.getPath());
+        assertEquals("/payments?username=buyer2", request.getPath());
         assertEquals("{\"amount\":100}", request.getBody().readUtf8());
     }
 
@@ -71,7 +71,7 @@ class PaymentServiceIntegrationTest extends AbstractTest {
     void pay_insufficientFunds_returnsInsufficientFunds() throws InterruptedException {
         enqueueJson(409, "{\"message\":\"Недостаточно средств\"}");
 
-        PaymentResult result = paymentService.pay(100L).block();
+        PaymentResult result = paymentService.pay("buyer1", 100L).block();
 
         assertEquals(new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null), result);
         SERVER.takeRequest();
@@ -81,7 +81,7 @@ class PaymentServiceIntegrationTest extends AbstractTest {
     void getBalance_serviceUnavailable_returnsUnavailable() throws InterruptedException {
         enqueueJson(503, "");
 
-        PaymentResult result = paymentService.getBalance().block();
+        PaymentResult result = paymentService.getBalance("buyer1").block();
 
         assertEquals(new PaymentResult(PaymentStatus.UNAVAILABLE, null), result);
         SERVER.takeRequest();

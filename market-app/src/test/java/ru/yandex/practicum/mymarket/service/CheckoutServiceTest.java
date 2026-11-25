@@ -40,20 +40,20 @@ class CheckoutServiceTest {
     @Test
     void buy_successfulPayment_createsOrderAfterPayment() {
         List<ItemDto> items = fillCart();
-        when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 800L)));
+        when(paymentService.pay("buyer1", 200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.SUCCESS, 800L)));
         when(orderService.buy("buyer1", items)).thenReturn(Mono.just(5L));
 
         assertEquals(new CheckoutResult(PaymentStatus.SUCCESS, 5L), checkoutService.buy("buyer1").block());
 
         InOrder inOrder = inOrder(paymentService, orderService);
-        inOrder.verify(paymentService).pay(200L);
+        inOrder.verify(paymentService).pay("buyer1", 200L);
         inOrder.verify(orderService).buy("buyer1", items);
     }
 
     @Test
     void buy_insufficientFunds_doesNotCreateOrder() {
         fillCart();
-        when(paymentService.pay(200L)).thenReturn(Mono.just(
+        when(paymentService.pay("buyer1", 200L)).thenReturn(Mono.just(
                 new PaymentResult(PaymentStatus.INSUFFICIENT_FUNDS, null)));
 
         assertEquals(new CheckoutResult(PaymentStatus.INSUFFICIENT_FUNDS, null), checkoutService.buy("buyer1").block());
@@ -64,7 +64,7 @@ class CheckoutServiceTest {
     @Test
     void buy_paymentServiceUnavailable_doesNotCreateOrder() {
         fillCart();
-        when(paymentService.pay(200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
+        when(paymentService.pay("buyer1", 200L)).thenReturn(Mono.just(new PaymentResult(PaymentStatus.UNAVAILABLE, null)));
 
         assertEquals(new CheckoutResult(PaymentStatus.UNAVAILABLE, null), checkoutService.buy("buyer1").block());
 
